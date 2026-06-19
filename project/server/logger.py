@@ -2,11 +2,13 @@ import json
 
 from project.database.db import query_all, query_one, execute
 from project.crypto.merkle import hash_message, build_merkle_root
+from project.crypto.sm_utils import sm4_decrypt
 
 
 def get_order_messages(order_id: str):
     """
     获取某个订单下的所有通信消息，按固定顺序返回
+    存储的加密内容自动 SM4 解密
     """
     sql = """
         SELECT id, msg_id, order_id, sender_pid, role, content, message_hash, timestamp, created_at
@@ -14,7 +16,17 @@ def get_order_messages(order_id: str):
         WHERE order_id = ?
         ORDER BY timestamp ASC, id ASC
     """
-    return query_all(sql, (order_id,))
+    rows = query_all(sql, (order_id,))
+    messages = []
+    for row in rows:
+        msg = dict(row)
+        # SM4 解密消息内容
+        try:
+            msg["content"] = sm4_decrypt(msg["content"])
+        except Exception:
+            pass
+        messages.append(msg)
+    return messages
 
 
 def create_merkle_snapshot(order_id: str) -> dict:
