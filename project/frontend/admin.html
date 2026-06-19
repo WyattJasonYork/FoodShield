@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -64,102 +65,131 @@
 </nav>
 
 <div class="container mt-4">
-    <div class="row">
-        <div class="col-lg-4">
-            <div class="card p-3">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="fw-bold mb-0">📦 订单列表</h5>
-                    <button class="btn btn-sm btn-outline-primary" onclick="loadOrders()">刷新</button>
-                </div>
-                <div id="orderList" class="list-group order-list">
-                    <div class="list-group-item text-muted text-center">点击刷新加载订单</div>
-                </div>
-            </div>
+    <div class="card p-3 mb-4" id="adminLoginCard">
+        <h5 class="fw-bold mb-3">🔐 管理员登录</h5>
 
-            <div class="card p-3">
-                <h5 class="fw-bold mb-3">🔍 订单查询</h5>
-                <div class="input-group mb-2">
-                    <input type="text" id="orderIdInput" class="form-control" placeholder="输入订单号">
-                    <button class="btn btn-primary" onclick="fetchLogs()">查询</button>
-                </div>
-                <div class="small text-muted">
-                    查询后会同时加载：
-                    <br>1. 通信记录
-                    <br>2. 审计日志
-                </div>
-            </div>
 
-            <div class="card p-3">
-                <h5 class="fw-bold mb-3">🛡️ 安全审计 (Merkle Tree)</h5>
-                <button class="btn btn-outline-success mb-2" onclick="sealLogs()">1. 生成快照 (Snapshot)</button>
-                <button class="btn btn-outline-warning" onclick="verifyLogs()">2. 验证完整性</button>
-                <div id="auditResult" class="mt-3 small"></div>
-            </div>
+    <div class="mb-3">
+        <label class="form-label">用户名</label>
+        <input type="text" class="form-control" id="adminUsername" value="admin">
+    </div>
 
-            <div class="card p-3 border-danger">
-                <h5 class="fw-bold mb-3 text-danger">🚨 条件溯源</h5>
-                <p class="small text-muted mb-2">
-                    输入匿名 PID 和溯源原因，系统将恢复真实身份，并记录 TRACE_SUCCESS / TRACE_FAIL 审计日志。
-                </p>
-                <input type="text" id="pidInput" class="form-control mb-2" placeholder="输入匿名 PID">
-                <input type="text" id="reasonInput" class="form-control mb-2" placeholder="输入溯源原因（如：投诉处理）">
-                <button class="btn btn-danger w-100" onclick="traceViolation()">启动溯源程序</button>
+    <div class="mb-3">
+        <label class="form-label">密码</label>
+        <input type="password" class="form-control" id="adminPassword" value="admin123456">
+    </div>
+
+    <button class="btn btn-primary" onclick="adminLogin()">登录</button>
+
+    <div class="mt-3" id="adminLoginMsg"></div>
+</div>
+
+<div class="alert alert-success d-none" id="adminStatusBox">
+    当前已登录管理员：<span id="adminStatusName"></span>
+</div>
+
+<div class="row d-none" id="adminMain">
+    <div class="col-lg-4">
+        <div class="card p-3">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0">📦 订单列表</h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="loadOrders()">刷新</button>
+            </div>
+            <div id="orderList" class="list-group order-list">
+                <div class="list-group-item text-muted text-center">点击刷新加载订单</div>
             </div>
         </div>
 
-        <div class="col-lg-8">
-            <div id="alertBox"></div>
-
-            <div class="card p-3">
-                <h5 class="fw-bold mb-3">📜 通信记录</h5>
-                <div class="table-responsive">
-                    <table class="table table-hover log-table">
-                        <thead class="table-light">
-                            <tr>
-                                <th>时间戳</th>
-                                <th>发送方 (PID)</th>
-                                <th>角色</th>
-                                <th>内容</th>
-                                <th>消息 Hash</th>
-                            </tr>
-                        </thead>
-                        <tbody id="logBody">
-                            <tr><td colspan="5" class="text-center text-muted">请输入订单号或从左侧选择订单...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
+        <div class="card p-3">
+            <h5 class="fw-bold mb-3">🔍 订单查询</h5>
+            <div class="input-group mb-2">
+                <input type="text" id="orderIdInput" class="form-control" placeholder="输入订单号">
+                <button class="btn btn-primary" onclick="fetchLogs()">查询</button>
             </div>
-
-            <div class="card p-3">
-                <h5 class="fw-bold mb-3">🧾 审计日志</h5>
-                <div class="table-responsive">
-                    <table class="table table-hover log-table">
-                        <thead class="table-light">
-                            <tr>
-                                <th>时间</th>
-                                <th>动作</th>
-                                <th>Merkle Root</th>
-                                <th>Detail</th>
-                            </tr>
-                        </thead>
-                        <tbody id="auditLogBody">
-                            <tr><td colspan="4" class="text-center text-muted">请输入订单号或从左侧选择订单...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
+            <div class="small text-muted">
+                查询后会同时加载：
+                <br>1. 通信记录
+                <br>2. 审计日志
             </div>
+        </div>
 
-            <div class="card p-3" id="traceResultCard" style="display: none;">
-                <h5 class="fw-bold mb-3 text-danger">🔎 溯源结果报告</h5>
-                <div id="traceResultBody" class="p-3 bg-light rounded"></div>
-            </div>
+        <div class="card p-3">
+            <h5 class="fw-bold mb-3">🛡️ 安全审计 (Merkle Tree)</h5>
+            <button class="btn btn-outline-success mb-2 w-100" onclick="sealLogs()">1. 生成快照 (Snapshot)</button>
+            <button class="btn btn-outline-warning w-100" onclick="verifyLogs()">2. 验证完整性</button>
+            <div id="auditResult" class="mt-3 small"></div>
+        </div>
+
+        <div class="card p-3 border-danger">
+            <h5 class="fw-bold mb-3 text-danger">🚨 条件溯源</h5>
+            <p class="small text-muted mb-2">
+                输入匿名 PID 和溯源原因，系统将恢复真实身份，并记录 TRACE_SUCCESS / TRACE_FAIL 审计日志。
+            </p>
+            <input type="text" id="pidInput" class="form-control mb-2" placeholder="输入匿名 PID">
+            <input type="text" id="reasonInput" class="form-control mb-2" placeholder="输入溯源原因（如：投诉处理）">
+            <button class="btn btn-danger w-100" onclick="traceViolation()">启动溯源程序</button>
         </div>
     </div>
+
+    <div class="col-lg-8">
+        <div id="alertBox"></div>
+
+        <div class="card p-3">
+            <h5 class="fw-bold mb-3">📜 通信记录</h5>
+            <div class="table-responsive">
+                <table class="table table-hover log-table">
+                    <thead class="table-light">
+                        <tr>
+                            <th>时间戳</th>
+                            <th>发送方 (PID)</th>
+                            <th>角色</th>
+                            <th>内容</th>
+                            <th>消息 Hash</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logBody">
+                        <tr><td colspan="5" class="text-center text-muted">请输入订单号或从左侧选择订单...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card p-3">
+            <h5 class="fw-bold mb-3">🧾 审计日志</h5>
+            <div class="table-responsive">
+                <table class="table table-hover log-table">
+                    <thead class="table-light">
+                        <tr>
+                            <th>时间</th>
+                            <th>动作</th>
+                            <th>Merkle Root</th>
+                            <th>Detail</th>
+                        </tr>
+                    </thead>
+                    <tbody id="auditLogBody">
+                        <tr><td colspan="4" class="text-center text-muted">请输入订单号或从左侧选择订单...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card p-3" id="traceResultCard" style="display: none;">
+            <h5 class="fw-bold mb-3 text-danger">🔎 溯源结果报告</h5>
+            <div id="traceResultBody" class="p-3 bg-light rounded"></div>
+        </div>
+    </div>
+</div>
+
+
 </div>
 
 <script>
     function showAlert(type, message) {
         const alertBox = document.getElementById("alertBox");
+        if (!alertBox) {
+            return;
+        }
+
         alertBox.innerHTML = `
             <div class="alert alert-${type} alert-dismissible fade show">
                 ${message}
@@ -196,6 +226,66 @@
         }
 
         return json;
+    }
+
+    async function checkAdminSession() {
+        try {
+            const json = await apiRequest("/admin/session");
+
+            if (json.success && json.data && json.data.is_admin) {
+                document.getElementById("adminLoginCard").classList.add("d-none");
+                document.getElementById("adminStatusBox").classList.remove("d-none");
+                document.getElementById("adminMain").classList.remove("d-none");
+                document.getElementById("adminStatusName").innerText =
+                    json.data.admin_username || "admin";
+
+                await loadOrders();
+                return true;
+            }
+
+            document.getElementById("adminLoginCard").classList.remove("d-none");
+            document.getElementById("adminStatusBox").classList.add("d-none");
+            document.getElementById("adminMain").classList.add("d-none");
+            return false;
+        } catch (e) {
+            document.getElementById("adminLoginCard").classList.remove("d-none");
+            document.getElementById("adminStatusBox").classList.add("d-none");
+            document.getElementById("adminMain").classList.add("d-none");
+            return false;
+        }
+    }
+
+    async function adminLogin() {
+        const username = document.getElementById("adminUsername").value.trim();
+        const password = document.getElementById("adminPassword").value.trim();
+        const msgBox = document.getElementById("adminLoginMsg");
+
+        if (!username || !password) {
+            msgBox.innerHTML = `<span class="text-danger">请输入用户名和密码</span>`;
+            return;
+        }
+
+        try {
+            const json = await apiRequest("/admin/login", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    username,
+                    password
+                })
+            });
+
+            if (json.success) {
+                msgBox.innerHTML = `<span class="text-success">登录成功</span>`;
+                await checkAdminSession();
+            } else {
+                msgBox.innerHTML = `<span class="text-danger">登录失败：${escapeHtml(json.message)}</span>`;
+            }
+        } catch (e) {
+            msgBox.innerHTML = `<span class="text-danger">登录失败：${escapeHtml(e.message)}</span>`;
+        }
     }
 
     function fillOrderId(orderId) {
@@ -308,139 +398,144 @@
                         <td><span class="badge bg-info text-dark">${escapeHtml(log.action || "-")}</span></td>
                         <td class="merkle-root">${escapeHtml(log.merkle_root || "-")}</td>
                         <td><pre class="json-box">${escapeHtml(detailText)}</pre></td>
-                    </tr>
-                `;
-            }).join("");
-        } catch (e) {
-            tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">加载失败：${escapeHtml(e.message)}</td></tr>`;
-            showAlert("danger", `获取审计日志失败：${escapeHtml(e.message)}`);
-        }
-    }
 
-    async function sealLogs() {
-        const orderId = document.getElementById("orderIdInput").value.trim();
-        if (!orderId) {
-            return showAlert("warning", "请先输入订单号！");
-        }
 
-        try {
-            const json = await apiRequest(`/admin/snapshot/${encodeURIComponent(orderId)}`, {
-                method: "POST"
-            });
-
-            const data = json.data || {};
-            document.getElementById("auditResult").innerHTML = `
-                <div class="text-success fw-bold mb-2">✅ 快照生成成功</div>
-                <div>message_count: ${escapeHtml(data.message_count ?? "-")}</div>
-                <div class="mt-2">Merkle Root:</div>
-                <div class="merkle-root">${escapeHtml(data.merkle_root || "-")}</div>
+                </tr>
             `;
+        }).join("");
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">加载失败：${escapeHtml(e.message)}</td></tr>`;
+        showAlert("danger", `获取审计日志失败：${escapeHtml(e.message)}`);
+    }
+}
 
-            await fetchAuditLogs(orderId);
-            await loadOrders();
-        } catch (e) {
-            showAlert("danger", `封存日志请求失败：${escapeHtml(e.message)}`);
-        }
+async function sealLogs() {
+    const orderId = document.getElementById("orderIdInput").value.trim();
+    if (!orderId) {
+        return showAlert("warning", "请先输入订单号！");
     }
 
-    async function verifyLogs() {
-        const orderId = document.getElementById("orderIdInput").value.trim();
-        if (!orderId) {
-            return showAlert("warning", "请先输入订单号！");
-        }
+    try {
+        const json = await apiRequest(`/admin/snapshot/${encodeURIComponent(orderId)}`, {
+            method: "POST"
+        });
 
-        try {
-            const json = await apiRequest(`/admin/verify/${encodeURIComponent(orderId)}`, {
-                method: "POST"
-            });
+        const data = json.data || {};
+        document.getElementById("auditResult").innerHTML = `
+            <div class="text-success fw-bold mb-2">✅ 快照生成成功</div>
+            <div>message_count: ${escapeHtml(data.message_count ?? "-")}</div>
+            <div class="mt-2">Merkle Root:</div>
+            <div class="merkle-root">${escapeHtml(data.merkle_root || "-")}</div>
+        `;
 
-            const data = json.data || {};
-            const ok = !!data.root_match;
+        await fetchAuditLogs(orderId);
+        await loadOrders();
+    } catch (e) {
+        showAlert("danger", `封存日志请求失败：${escapeHtml(e.message)}`);
+    }
+}
 
-            document.getElementById("auditResult").innerHTML = `
-                <div class="${ok ? 'text-success' : 'text-danger'} fw-bold mb-2">
-                    ${ok ? "✅ 完整性验证通过" : "❌ 完整性验证失败"}
-                </div>
-                <div>hash_mismatch_count: ${escapeHtml(data.hash_mismatch_count ?? "-")}</div>
-                <div>root_match: ${escapeHtml(data.root_match ?? "-")}</div>
-                <div class="mt-2">snapshot_root:</div>
-                <div class="merkle-root">${escapeHtml(data.snapshot_root || "-")}</div>
-                <div class="mt-2">current_root:</div>
-                <div class="merkle-root">${escapeHtml(data.current_root || "-")}</div>
-            `;
-
-            await fetchAuditLogs(orderId);
-            await loadOrders();
-        } catch (e) {
-            showAlert("danger", `验证请求失败：${escapeHtml(e.message)}`);
-        }
+async function verifyLogs() {
+    const orderId = document.getElementById("orderIdInput").value.trim();
+    if (!orderId) {
+        return showAlert("warning", "请先输入订单号！");
     }
 
-    async function traceViolation() {
-        const pid = document.getElementById("pidInput").value.trim();
-        const reason = document.getElementById("reasonInput").value.trim();
+    try {
+        const json = await apiRequest(`/admin/verify/${encodeURIComponent(orderId)}`, {
+            method: "POST"
+        });
 
-        if (!pid || !reason) {
-            return showAlert("warning", "必须提供 PID 和溯源原因！");
-        }
+        const data = json.data || {};
+        const ok = !!data.root_match;
 
-        try {
-            const json = await apiRequest("/admin/trace", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ pid, reason })
-            });
+        document.getElementById("auditResult").innerHTML = `
+            <div class="${ok ? 'text-success' : 'text-danger'} fw-bold mb-2">
+                ${ok ? "✅ 完整性验证通过" : "❌ 完整性验证失败"}
+            </div>
+            <div>hash_mismatch_count: ${escapeHtml(data.hash_mismatch_count ?? "-")}</div>
+            <div>root_match: ${escapeHtml(data.root_match ?? "-")}</div>
+            <div class="mt-2">snapshot_root:</div>
+            <div class="merkle-root">${escapeHtml(data.snapshot_root || "-")}</div>
+            <div class="mt-2">current_root:</div>
+            <div class="merkle-root">${escapeHtml(data.current_root || "-")}</div>
+        `;
 
-            const data = json.data || {};
-            const card = document.getElementById("traceResultCard");
-            const body = document.getElementById("traceResultBody");
+        await fetchAuditLogs(orderId);
+        await loadOrders();
+    } catch (e) {
+        showAlert("danger", `验证请求失败：${escapeHtml(e.message)}`);
+    }
+}
 
-            const orders = data.orders || [];
-            const ordersHtml = orders.length > 0
-                ? `<ul class="mb-0">
-                    ${orders.map(order => `
-                        <li class="mb-2">
-                            <div><strong>order_id:</strong> <span class="hash-text">${escapeHtml(order.order_id)}</span></div>
-                            <div><strong>status:</strong> ${escapeHtml(order.status)}</div>
-                            <div><strong>created_at:</strong> ${escapeHtml(order.created_at)}</div>
-                        </li>
-                    `).join("")}
-                </ul>`
-                : `<div class="text-muted">无关联订单</div>`;
+async function traceViolation() {
+    const pid = document.getElementById("pidInput").value.trim();
+    const reason = document.getElementById("reasonInput").value.trim();
 
-            body.innerHTML = `
-                <div class="alert alert-danger">
-                    <strong>TRACE_SUCCESS</strong>
-                </div>
-                <div class="mb-2"><strong>用户名：</strong>${escapeHtml(data.username)}</div>
-                <div class="mb-2"><strong>用户ID：</strong>${escapeHtml(data.user_id)}</div>
-                <div class="mb-2"><strong>PID：</strong><span class="hash-text">${escapeHtml(data.pid)}</span></div>
-                <div class="mb-2"><strong>注册时间：</strong>${escapeHtml(data.created_at)}</div>
-                <div class="mb-2"><strong>关联订单：</strong></div>
-                ${ordersHtml}
-            `;
-
-            card.style.display = "block";
-
-            if (orders.length > 0) {
-                document.getElementById("orderIdInput").value = orders[0].order_id;
-                await fetchAuditLogs(orders[0].order_id);
-            }
-
-            showAlert("success", "溯源成功，结果已展示。");
-        } catch (e) {
-            document.getElementById("traceResultCard").style.display = "none";
-            showAlert("danger", `溯源请求失败：${escapeHtml(e.message)}`);
-        }
+    if (!pid || !reason) {
+        return showAlert("warning", "必须提供 PID 和溯源原因！");
     }
 
-    window.addEventListener("DOMContentLoaded", () => {
-        loadOrders();
-    });
+    try {
+        const json = await apiRequest("/admin/trace", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ pid, reason })
+        });
+
+        const data = json.data || {};
+        const card = document.getElementById("traceResultCard");
+        const body = document.getElementById("traceResultBody");
+
+        const orders = data.orders || [];
+        const ordersHtml = orders.length > 0
+            ? `<ul class="mb-0">
+                ${orders.map(order => `
+                    <li class="mb-2">
+                        <div><strong>order_id:</strong> <span class="hash-text">${escapeHtml(order.order_id)}</span></div>
+                        <div><strong>status:</strong> ${escapeHtml(order.status)}</div>
+                        <div><strong>created_at:</strong> ${escapeHtml(order.created_at)}</div>
+                    </li>
+                `).join("")}
+            </ul>`
+            : `<div class="text-muted">无关联订单</div>`;
+
+        body.innerHTML = `
+            <div class="alert alert-danger">
+                <strong>TRACE_SUCCESS</strong>
+            </div>
+            <div class="mb-2"><strong>用户名：</strong>${escapeHtml(data.username)}</div>
+            <div class="mb-2"><strong>用户ID：</strong>${escapeHtml(data.user_id)}</div>
+            <div class="mb-2"><strong>PID：</strong><span class="hash-text">${escapeHtml(data.pid)}</span></div>
+            <div class="mb-2"><strong>注册时间：</strong>${escapeHtml(data.created_at)}</div>
+            <div class="mb-2"><strong>关联订单：</strong></div>
+            ${ordersHtml}
+        `;
+
+        card.style.display = "block";
+
+        if (orders.length > 0) {
+            document.getElementById("orderIdInput").value = orders[0].order_id;
+            await fetchAuditLogs(orders[0].order_id);
+        }
+
+        showAlert("success", "溯源成功，结果已展示。");
+    } catch (e) {
+        document.getElementById("traceResultCard").style.display = "none";
+        showAlert("danger", `溯源请求失败：${escapeHtml(e.message)}`);
+    }
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+    checkAdminSession();
+});
+
+
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
 </body>
 </html>
