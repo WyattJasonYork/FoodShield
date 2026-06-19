@@ -96,10 +96,12 @@ FoodShield/
 
 ## 环境要求
 - Python 3.10+
-- pip（Python包管理工具，默认随Python安装）
+- pip（Python 包管理工具，默认随 Python 安装）
 - 推荐使用 Python 虚拟环境
-- 现代浏览器： Chrome/Edge/Firefox
+- 现代浏览器：Chrome/Edge/Firefox
 - 操作系统：Windows/MacOS/Linux
+
+> 💡 **提示**：本项目同时支持 pip 和 [uv](https://docs.astral.sh/uv/) 两种依赖管理方式，任选其一即可。
 
 ## 主要依赖
 - Flask
@@ -145,6 +147,44 @@ Running on http://127.0.0.1:5000
 ```
 
 注意：由于项目采用 project 作为顶层包，建议从项目根目录使用 python -m project.server.app 启动，不建议直接进入 project/server/ 后执行 python app.py。
+
+---
+
+### 🚀 方式二：使用 uv（推荐）
+
+`uv` 是一个极速的 Python 包管理器，可以替代 pip + venv 的手动流程，**一步完成**环境创建和依赖安装。
+
+#### 安装 uv
+```
+Windows PowerShell：
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+macOS / Linux：
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+#### 一键创建环境并安装依赖
+```
+uv sync
+```
+该命令会自动完成：
+- 读取 `.python-version` 锁定 Python 版本
+- 创建 `.venv` 虚拟环境
+- 安装 `pyproject.toml` 中声明的全部依赖
+- 生成 `uv.lock` 锁文件确保可复现构建
+
+#### 启动项目
+```
+uv run python -m project.server.app
+```
+`uv run` 会自动使用 `.venv` 中的 Python 环境，无需手动激活虚拟环境。
+
+> ⚡ 如果仍习惯 pip 工作流，`uv` 也兼容传统命令：
+> ```bash
+> uv pip install -r requirements.txt   # 等价于 pip install -r requirements.txt（但更快）
+> ```
+
+---
 
 ## 页面入口
 |页面|入口|

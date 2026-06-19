@@ -12,6 +12,7 @@ from project.database.db import init_db, execute, query_one, query_all
 from project.crypto.pid import generate_pid
 from project.crypto.token_utils import generate_token, verify_token
 from project.crypto.merkle import hash_message
+from project.crypto.sm_utils import sm4_encrypt, sm4_decrypt
 from project.server.logger import create_merkle_snapshot, verify_order_integrity
 
 
@@ -45,12 +46,16 @@ def get_order_by_order_id(order_id: str):
 
 
 def save_message(msg_id, order_id, sender_pid, role, content, message_hash, timestamp):
+    """
+    保存消息到数据库，消息内容使用 SM4 加密存储
+    """
+    encrypted_content = sm4_encrypt(content)
     execute(
         """
         INSERT INTO messages (msg_id, order_id, sender_pid, role, content, message_hash, timestamp)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
-        (msg_id, order_id, sender_pid, role, content, message_hash, timestamp)
+        (msg_id, order_id, sender_pid, role, encrypted_content, message_hash, timestamp)
     )
 
 
@@ -64,7 +69,17 @@ def get_message_history_by_order(order_id: str):
         """,
         (order_id,)
     )
-    return [dict(row) for row in rows]
+    messages = []
+    for row in rows:
+        msg = dict(row)
+        # SM4 解密消息内容
+        try:
+            msg["content"] = sm4_decrypt(msg["content"])
+        except Exception:
+            # 兼容旧数据（明文或损坏数据保持原样）
+            pass
+        messages.append(msg)
+    return messages
 
 def get_user_by_pid(pid: str):
     return query_one("SELECT * FROM users WHERE pid = ?", (pid,))
