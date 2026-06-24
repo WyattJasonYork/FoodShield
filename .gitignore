@@ -206,3 +206,11 @@ __marimo__/
 
 *.db
 *.db.backup
+
+.serena/
+
+# pdf
+*.pdf
+
+# 答辩准备md
+答辩准备_Q&A.md

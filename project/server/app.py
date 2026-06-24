@@ -7,12 +7,14 @@ from functools import wraps
 import uuid
 import json
 import os
+import hmac
+import secrets
 
 from project.database.db import init_db, execute, query_one, query_all
 from project.crypto.pid import generate_pid
 from project.crypto.token_utils import generate_token, verify_token
 from project.crypto.merkle import hash_message
-from project.crypto.sm_utils import sm4_encrypt, sm4_decrypt
+from project.crypto.sm_utils import sm4_encrypt, sm4_decrypt, sm3_strhash
 from project.server.logger import create_merkle_snapshot, verify_order_integrity
 
 
@@ -192,23 +194,54 @@ def css_files(filename):
 
 @app.route("/register", methods=["POST"])
 def register():
+    """用户注册：用户名 + 密码 + 验证码 → 生成匿名 PID"""
     data = request.json
-    if not data or "username" not in data:
-        return jsonify({"success": False, "message": "username is required"}), 400
+    if not data:
+        return jsonify({"success": False, "message": "请求体不能为空"}), 400
 
-    username = data["username"].strip()
+    username = (data.get("username") or "").strip()
+    password = (data.get("password") or "").strip()
+    confirm_password = (data.get("confirm_password") or "").strip()
+    captcha_answer = (data.get("captcha_answer") or "").strip()
+
+    # 字段完整性校验
     if not username:
-        return jsonify({"success": False, "message": "username cannot be empty"}), 400
+        return jsonify({"success": False, "message": "用户名不能为空"}), 400
+    if not password:
+        return jsonify({"success": False, "message": "密码不能为空"}), 400
+    if len(password) < 6:
+        return jsonify({"success": False, "message": "密码长度不能少于 6 位"}), 400
+    if password != confirm_password:
+        return jsonify({"success": False, "message": "两次密码输入不一致"}), 400
+    if not captcha_answer:
+        return jsonify({"success": False, "message": "验证码不能为空"}), 400
 
+    # 验证码校验
+    session_captcha = session.get("captcha_answer")
+    if session_captcha is None:
+        return jsonify({"success": False, "message": "验证码已过期，请刷新后重试"}), 400
+    try:
+        if int(captcha_answer) != int(session_captcha):
+            return jsonify({"success": False, "message": "验证码错误"}), 400
+    except ValueError:
+        return jsonify({"success": False, "message": "验证码格式错误"}), 400
+    # 验证码一次性使用
+    session.pop("captcha_answer", None)
+
+    # 检查用户名重复
     existing = query_one("SELECT * FROM users WHERE username = ?", (username,))
     if existing:
-        return jsonify({"success": False, "message": "username already exists"}), 400
+        return jsonify({"success": False, "message": "用户名已存在"}), 400
 
     try:
+        # 生成密码哈希: SM3(salt + password)
+        salt = secrets.token_hex(16)
+        password_hash = sm3_strhash(salt + password)
+
         temp_pid = f"temp_{uuid.uuid4()}"
         user_id = execute(
-            "INSERT INTO users (username, pid) VALUES (?, ?)",
-            (username, temp_pid)
+            "INSERT INTO users (username, pid, password_hash, salt) VALUES (?, ?, ?, ?)",
+            (username, temp_pid, password_hash, salt)
         )
 
         pid_result = generate_pid("FoodShield", str(user_id))
@@ -216,18 +249,114 @@ def register():
 
         execute("UPDATE users SET pid = ? WHERE id = ?", (pid, user_id))
 
+        # 注册即登录
+        session["user_id"] = user_id
+        session["username"] = username
+
         return jsonify({
             "success": True,
-            "message": "user registered successfully",
+            "message": "注册成功",
             "data": {
                 "user_id": user_id,
-                "username": username,
-                "pid": pid
+                "username": username
             }
         }), 201
 
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
+
+
+# ====================== 验证码 ======================
+
+@app.route("/captcha", methods=["GET"])
+def get_captcha():
+    """返回数学验证码题目，答案存入 session"""
+    import random
+    a = random.randint(1, 20)
+    b = random.randint(1, 20)
+    op = random.choice(["+", "-"])
+    if op == "+":
+        answer = a + b
+    else:
+        if a < b:
+            a, b = b, a
+        answer = a - b
+    question = f"{a} {op} {b} = ?"
+    session["captcha_answer"] = answer
+    return jsonify({
+        "success": True,
+        "data": {
+            "question": question
+        }
+    })
+
+
+# ====================== 用户登录/会话 ======================
+
+@app.route("/login", methods=["POST"])
+def login():
+    """用户登录：用户名 + 密码 → 验证 SM3(salt + password)"""
+    data = request.json
+    if not data:
+        return jsonify({"success": False, "message": "请求体不能为空"}), 400
+
+    username = (data.get("username") or "").strip()
+    password = (data.get("password") or "").strip()
+
+    if not username or not password:
+        return jsonify({"success": False, "message": "用户名和密码不能为空"}), 400
+
+    user = query_one("SELECT * FROM users WHERE username = ?", (username,))
+    if not user:
+        return jsonify({"success": False, "message": "用户名或密码错误"}), 401
+
+    computed_hash = sm3_strhash(user["salt"] + password)
+    if not hmac.compare_digest(computed_hash, user["password_hash"]):
+        return jsonify({"success": False, "message": "用户名或密码错误"}), 401
+
+    session["user_id"] = user["id"]
+    session["username"] = user["username"]
+
+    return jsonify({
+        "success": True,
+        "message": "登录成功",
+        "data": {
+            "user_id": user["id"],
+            "username": user["username"],
+            "pid": user["pid"]
+        }
+    })
+
+
+@app.route("/user/session", methods=["GET"])
+def get_user_session():
+    """检查当前用户登录状态"""
+    if session.get("user_id"):
+        user = query_one("SELECT id, username, pid FROM users WHERE id = ?", (session["user_id"],))
+        if user:
+            return jsonify({
+                "success": True,
+                "data": {
+                    "logged_in": True,
+                    "user_id": user["id"],
+                    "username": user["username"],
+                    "pid": user["pid"]
+                }
+            })
+    return jsonify({
+        "success": True,
+        "data": {
+            "logged_in": False
+        }
+    })
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    """用户登出"""
+    session.pop("user_id", None)
+    session.pop("username", None)
+    return jsonify({"success": True, "message": "已登出"})
 
 
 @app.route("/create_order", methods=["POST"])
@@ -719,11 +848,7 @@ def admin_trace():
 
 @socketio.on("connect")
 def handle_connect():
-    emit("system_message", {
-        "type": "system",
-        "message": "websocket connected",
-        "timestamp": now_iso()
-    })
+    pass  # 静默连接，不发送系统消息到聊天界面
 
 
 @socketio.on("join_order")
@@ -930,13 +1055,6 @@ def handle_send_message(data):
 
         emit("receive_message", msg, room=order_id)
 
-        emit("system_message", {
-            "type": "system",
-            "order_id": order_id,
-            "message": f"log snapshot updated, root={snapshot['merkle_root'][:12]}...",
-            "timestamp": now_iso()
-        }, room=order_id)
-
     except Exception as e:
         print(f"[send_message] error: {e}")
         emit("error_message", {
@@ -1076,4 +1194,4 @@ def admin_trace_violation():
 
 if __name__ == "__main__":
     init_db()
-    socketio.run(app, host="127.0.0.1", port=5000, debug=True)
+    socketio.run(app, host="127.0.0.1", port=5000, debug=True, allow_unsafe_werkzeug=True)
