@@ -126,26 +126,50 @@
     <div id="alertBox"></div>
 
     <div class="row g-4">
-        <!-- 1 注册 -->
+        <!-- 0 登录/注册 -->
         <div class="col-lg-4">
             <div class="card step-card p-4">
-                <div class="step-title text-primary mb-2">1. 用户注册</div>
-                <div class="section-tip mb-3">输入用户名，生成匿名身份 PID。</div>
+                <div class="step-title text-primary mb-2">0. 登录 / 注册</div>
+                <div class="section-tip mb-3" id="loginStatus">请先登录或注册。</div>
 
-                <div class="mb-3">
-                    <label for="username" class="form-label">用户名</label>
-                    <input id="username" type="text" class="form-control" placeholder="例如：wjy">
+                <!-- 登录表单 -->
+                <div id="loginForm">
+                    <div class="mb-2">
+                        <input id="loginUsername" type="text" class="form-control" placeholder="用户名">
+                    </div>
+                    <div class="mb-2">
+                        <input id="loginPassword" type="password" class="form-control" placeholder="密码">
+                    </div>
+                    <div class="d-grid mb-2">
+                        <button id="loginBtn" class="btn btn-primary" onclick="handleLogin()">登录</button>
+                    </div>
+                    <div class="text-center">
+                        <a href="#" class="text-muted small" onclick="showRegisterForm(); return false;">没有账号？点击注册</a>
+                    </div>
                 </div>
 
-                <div class="d-grid mb-3">
-                    <button id="registerBtn" class="btn btn-primary btn-lg" onclick="handleRegister()">注册</button>
-                </div>
-
-                <div class="kv-row">
-                    <div class="kv-key">当前 PID</div>
-                    <div id="pidBox" class="result-box">尚未生成</div>
-                    <div class="mt-2">
-                        <button class="btn btn-outline-secondary btn-sm btn-copy" onclick="copyText('pidBox')">复制 PID</button>
+                <!-- 注册表单（默认隐藏） -->
+                <div id="registerForm" style="display:none;">
+                    <div class="mb-2">
+                        <input id="regUsername" type="text" class="form-control" placeholder="用户名">
+                    </div>
+                    <div class="mb-2">
+                        <input id="regPassword" type="password" class="form-control" placeholder="密码（至少6位）">
+                    </div>
+                    <div class="mb-2">
+                        <input id="regConfirmPassword" type="password" class="form-control" placeholder="确认密码">
+                    </div>
+                    <!-- 验证码 -->
+                    <div class="mb-2 input-group">
+                        <input id="regCaptcha" type="text" class="form-control" placeholder="验证码答案">
+                        <button id="captchaBtn" class="btn btn-outline-secondary" type="button" onclick="refreshCaptcha()">获取验证码</button>
+                    </div>
+                    <div id="captchaQuestion" class="section-tip mb-2 text-center" style="display:none;"></div>
+                    <div class="d-grid mb-2">
+                        <button id="registerBtn" class="btn btn-success" onclick="handleRegister()">注册</button>
+                    </div>
+                    <div class="text-center">
+                        <a href="#" class="text-muted small" onclick="showLoginForm(); return false;">已有账号？返回登录</a>
                     </div>
                 </div>
             </div>
@@ -332,6 +356,26 @@ function fillVerifyFields(order_id, pid, timestamp, token) {
     document.getElementById("verifyToken").value = token || "";
 }
 
+async function checkSession() {
+    try {
+        const res = await fetch(`${BASE_URL}/user/session`);
+        const result = await res.json();
+        if (result.success && result.data.logged_in) {
+            localStorage.setItem("user_id", result.data.user_id);
+            localStorage.setItem("username", result.data.username);
+            localStorage.setItem("pid", result.data.pid);
+            document.getElementById("pidInput").value = result.data.pid;
+            onLoginSuccess(result.data);
+        }
+    } catch (e) {
+        // Server not ready, use localStorage
+        const uname = localStorage.getItem("username");
+        if (uname) {
+            document.getElementById("loginStatus").innerText = "离线模式";
+        }
+    }
+}
+
 function saveOrderData(data) {
     localStorage.setItem("pid", data.pid);
     localStorage.setItem("order_id", data.order_id);
@@ -346,7 +390,6 @@ function loadLocalData() {
     const token = localStorage.getItem("token") || "";
 
     if (pid) {
-        document.getElementById("pidBox").innerText = pid;
         document.getElementById("pidInput").value = pid;
     }
     fillVerifyFields(order_id, pid, timestamp, token);
@@ -468,11 +511,16 @@ async function loadMessageHistory() {
 }
 
 async function handleRegister() {
-    const username = document.getElementById("username").value.trim();
-    if (!username) {
-        showAlert("warning", "请输入用户名。");
-        return;
-    }
+    const username = document.getElementById("regUsername").value.trim();
+    const password = document.getElementById("regPassword").value;
+    const confirmPassword = document.getElementById("regConfirmPassword").value;
+    const captchaAnswer = document.getElementById("regCaptcha").value.trim();
+
+    if (!username) { showAlert("warning", "请输入用户名。"); return; }
+    if (!password) { showAlert("warning", "请输入密码。"); return; }
+    if (password.length < 6) { showAlert("warning", "密码长度不能少于 6 位。"); return; }
+    if (password !== confirmPassword) { showAlert("warning", "两次密码输入不一致。"); return; }
+    if (!captchaAnswer) { showAlert("warning", "请输入验证码答案。"); return; }
 
     setButtonLoading("registerBtn", "注册中...", true);
 
@@ -480,17 +528,21 @@ async function handleRegister() {
         const res = await fetch(`${BASE_URL}/register`, {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ username })
+            body: JSON.stringify({
+                username,
+                password,
+                confirm_password: confirmPassword,
+                captcha_answer: captchaAnswer
+            })
         });
 
         const result = await res.json();
 
         if (result.success) {
-            const pid = result.data.pid;
-            document.getElementById("pidBox").innerText = pid;
-            document.getElementById("pidInput").value = pid;
-            localStorage.setItem("pid", pid);
-            showAlert("success", "注册成功，已生成匿名 PID。");
+            localStorage.setItem("user_id", result.data.user_id);
+            localStorage.setItem("username", result.data.username);
+            onLoginSuccess(result.data);
+            showAlert("success", "注册成功！");
         } else {
             showAlert("danger", result.message || "注册失败。");
         }
@@ -499,6 +551,71 @@ async function handleRegister() {
     } finally {
         setButtonLoading("registerBtn", "注册中...", false);
     }
+}
+
+async function handleLogin() {
+    const username = document.getElementById("loginUsername").value.trim();
+    const password = document.getElementById("loginPassword").value;
+
+    if (!username) { showAlert("warning", "请输入用户名。"); return; }
+    if (!password) { showAlert("warning", "请输入密码。"); return; }
+
+    setButtonLoading("loginBtn", "登录中...", true);
+
+    try {
+        const res = await fetch(`${BASE_URL}/login`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ username, password })
+        });
+
+        const result = await res.json();
+
+        if (result.success) {
+            localStorage.setItem("user_id", result.data.user_id);
+            localStorage.setItem("username", result.data.username);
+            localStorage.setItem("pid", result.data.pid);
+            document.getElementById("pidInput").value = result.data.pid;
+            onLoginSuccess(result.data);
+            showAlert("success", "登录成功！");
+        } else {
+            showAlert("danger", result.message || "登录失败。");
+        }
+    } catch (error) {
+        showAlert("danger", "请求失败，请检查后端是否启动。");
+    } finally {
+        setButtonLoading("loginBtn", "登录中...", false);
+    }
+}
+
+async function refreshCaptcha() {
+    try {
+        const res = await fetch(`${BASE_URL}/captcha`);
+        const result = await res.json();
+        if (result.success) {
+            document.getElementById("captchaQuestion").innerText = result.data.question;
+            document.getElementById("captchaQuestion").style.display = "block";
+        }
+    } catch (error) {
+        showAlert("danger", "获取验证码失败。");
+    }
+}
+
+function showRegisterForm() {
+    document.getElementById("loginForm").style.display = "none";
+    document.getElementById("registerForm").style.display = "block";
+}
+
+function showLoginForm() {
+    document.getElementById("loginForm").style.display = "block";
+    document.getElementById("registerForm").style.display = "none";
+}
+
+function onLoginSuccess(data) {
+    document.getElementById("loginStatus").innerText = `已登录：${data.username}`;
+    document.getElementById("loginForm").style.display = "none";
+    document.getElementById("registerForm").style.display = "none";
+    document.getElementById("pidInput").value = localStorage.getItem("pid") || "";
 }
 
 async function handleCreateOrder() {
@@ -525,7 +642,6 @@ async function handleCreateOrder() {
             document.getElementById("orderIdBox").innerText = data.order_id;
             document.getElementById("timestampBox").innerText = data.timestamp;
             document.getElementById("tokenBox").innerText = data.token;
-            document.getElementById("pidBox").innerText = data.pid;
             document.getElementById("pidInput").value = data.pid;
 
             updateStatusBadge(data.status);
@@ -749,6 +865,8 @@ socket.on("error_message", (msg) => {
 window.onload = () => {
     loadLocalData();
     enableChatInput(false);
+    // Initialize - try to refresh captcha if register form might be used
+    refreshCaptcha();
 };
 </script>
 

@@ -3,6 +3,8 @@ CREATE TABLE IF NOT EXISTS users (
     username TEXT NOT NULL UNIQUE,
     pid TEXT NOT NULL UNIQUE,
     pid_r TEXT,
+    password_hash TEXT NOT NULL DEFAULT '',
+    salt TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
