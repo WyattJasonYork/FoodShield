@@ -136,15 +136,33 @@
         </div>
 
         <div class="card p-3">
-            <h5 class="fw-bold mb-3">🔍 订单查询</h5>
-            <div class="input-group mb-2">
+            <h5 class="fw-bold mb-3">🔍 审计搜索</h5>
+            <div class="mb-2">
+                <label class="form-label small">订单号</label>
                 <input type="text" id="orderIdInput" class="form-control" placeholder="输入订单号">
-                <button class="btn btn-primary" onclick="fetchLogs()">查询</button>
+            </div>
+            <div class="mb-2">
+                <label class="form-label small">消息 Hash</label>
+                <input type="text" id="adminHashInput" class="form-control" placeholder="输入完整或部分消息哈希">
+            </div>
+            <div class="mb-2">
+                <label class="form-label small">审计动作</label>
+                <select id="adminActionInput" class="form-select">
+                    <option value="">全部动作</option>
+                    <option value="CLIENT_ROOT_REPORTED">CLIENT_ROOT_REPORTED</option>
+                    <option value="TRACE_SUCCESS">TRACE_SUCCESS</option>
+                    <option value="TRACE_FAIL">TRACE_FAIL</option>
+                    <option value="ADMIN_LOGIN_SUCCESS">ADMIN_LOGIN_SUCCESS</option>
+                    <option value="TRACE_KEYWORD_SCAN_BLOCKED">TRACE_KEYWORD_SCAN_BLOCKED</option>
+                </select>
+            </div>
+            <div class="d-grid gap-2 mb-2">
+                <button class="btn btn-primary" onclick="fetchLogs()">按订单号加载 Hash 记录</button>
+                <button class="btn btn-outline-primary" onclick="searchAdminOrders()">搜索审计订单</button>
             </div>
             <div class="small text-muted">
-                查询后会同时加载：
-                <br>1. 通信记录
-                <br>2. 审计日志
+                管理员端仅按订单号、消息 Hash、Merkle Root 和审计动作检索。
+                <br><span class="text-danger">不展示订单备注、标签、PID、Token 或通信明文。</span>
             </div>
         </div>
 
@@ -158,9 +176,9 @@
         <div class="card p-3 border-danger">
             <h5 class="fw-bold mb-3 text-danger">🚨 条件溯源</h5>
             <p class="small text-muted mb-2">
-                输入匿名 PID 和溯源原因，系统将恢复真实身份，并记录 TRACE_SUCCESS / TRACE_FAIL 审计日志。
+                输入订单号和溯源原因，系统根据订单映射恢复真实身份，并记录 TRACE_SUCCESS / TRACE_FAIL 审计日志。
             </p>
-            <input type="text" id="pidInput" class="form-control mb-2" placeholder="输入匿名 PID">
+            <input type="text" id="traceOrderIdInput" class="form-control mb-2" placeholder="输入订单号（而不是 PID）">
             <input type="text" id="reasonInput" class="form-control mb-2" placeholder="输入溯源原因（如：投诉处理）">
             <button class="btn btn-danger w-100" onclick="traceViolation()">启动溯源程序</button>
         </div>
@@ -176,9 +194,8 @@
                     <thead class="table-light">
                         <tr>
                             <th>时间戳</th>
-                            <th>发送方 (PID)</th>
                             <th>角色</th>
-                            <th>内容</th>
+                            <th>内容状态</th>
                             <th>消息 Hash</th>
                         </tr>
                     </thead>
@@ -400,6 +417,8 @@
 
     function fillOrderId(orderId) {
         document.getElementById("orderIdInput").value = orderId;
+        const traceInput = document.getElementById("traceOrderIdInput");
+        if (traceInput) traceInput.value = orderId;
         fetchLogs();
     }
 
@@ -436,6 +455,59 @@
         }
     }
 
+    async function searchAdminOrders() {
+        const list = document.getElementById("orderList");
+        const orderId = document.getElementById("orderIdInput").value.trim();
+        const hash = document.getElementById("adminHashInput").value.trim();
+        const action = document.getElementById("adminActionInput").value.trim();
+
+        const params = new URLSearchParams();
+        if (orderId) params.set("order_id", orderId);
+        if (hash) params.set("hash", hash);
+        if (action) params.set("action", action);
+
+        list.innerHTML = `<div class="list-group-item text-muted text-center">搜索中...</div>`;
+
+        try {
+            const json = await apiRequest(`/admin/orders/search${params.toString() ? "?" + params.toString() : ""}`);
+            const orders = json.data || [];
+
+            if (orders.length === 0) {
+                list.innerHTML = `<div class="list-group-item text-muted text-center">未找到匹配审计订单</div>`;
+                return;
+            }
+
+            list.innerHTML = orders.map(order => {
+                const hashes = order.message_hashes || [];
+                const hashPreview = hashes.length > 0
+                    ? hashes.slice(0, 3).map(h => {
+                        const fullHash = h.message_hash || "";
+                        const shortHash = fullHash ? `${fullHash.substring(0, 10)}...${fullHash.substring(fullHash.length - 6)}` : "-";
+                        return `<div class="small hash-text">${escapeHtml(h.role || "-")} · ${escapeHtml(shortHash)}</div>`;
+                    }).join("")
+                    : `<div class="small text-muted">暂无消息 Hash</div>`;
+
+                return `
+                    <button type="button"
+                            class="list-group-item list-group-item-action order-item"
+                            onclick="fillOrderId('${escapeHtml(order.order_id)}')">
+                        <div class="fw-bold">${escapeHtml(order.order_id)}</div>
+                        <div class="small text-muted">status: ${escapeHtml(order.status || "-")} | message_count: ${escapeHtml(order.message_count ?? "0")}</div>
+                        <div class="small text-muted">latest_action: ${escapeHtml(order.latest_action || "-")}</div>
+                        <div class="small text-muted">latest_merkle_root:</div>
+                        <div class="merkle-root">${escapeHtml(order.latest_merkle_root || "-")}</div>
+                        <div class="mt-1">${hashPreview}</div>
+                    </button>
+                `;
+            }).join("");
+
+            showAlert("success", "审计搜索完成：结果不包含备注、标签、PID、Token 或通信明文。");
+        } catch (e) {
+            list.innerHTML = `<div class="list-group-item text-danger text-center">搜索失败：${escapeHtml(e.message)}</div>`;
+            showAlert("danger", `审计搜索失败：${escapeHtml(e.message)}`);
+        }
+    }
+
     async function fetchLogs() {
         const orderId = document.getElementById("orderIdInput").value.trim();
         if (!orderId) {
@@ -458,18 +530,13 @@
                         ? `${fullHash.substring(0, 10)}...${fullHash.substring(fullHash.length - 6)}`
                         : "-";
 
-                    const senderPid = log.sender_pid
-                        ? `${log.sender_pid.substring(0, 8)}...`
-                        : "-";
-
                     const timeStr = log.timestamp ? new Date(log.timestamp).toLocaleString() : "-";
 
                     return `
                         <tr>
                             <td class="small">${escapeHtml(timeStr)}</td>
-                            <td><span class="badge bg-secondary">${escapeHtml(senderPid)}</span></td>
                             <td>${escapeHtml(log.role || "-")}</td>
-                            <td>${escapeHtml(log.content || "")}</td>
+                            <td><span class="badge bg-success">Hash-only</span> 不展示明文 / PID</td>
                             <td class="hash-text" title="${escapeHtml(fullHash)}">${escapeHtml(shortHash)}</td>
                         </tr>
                     `;
@@ -579,11 +646,12 @@ async function verifyLogs() {
 }
 
 async function traceViolation() {
-    const pid = document.getElementById("pidInput").value.trim();
+    const traceOrderInput = document.getElementById("traceOrderIdInput");
+    const orderId = (traceOrderInput.value.trim() || document.getElementById("orderIdInput").value.trim());
     const reason = document.getElementById("reasonInput").value.trim();
 
-    if (!pid || !reason) {
-        return showAlert("warning", "必须提供 PID 和溯源原因！");
+    if (!orderId || !reason) {
+        return showAlert("warning", "必须提供订单号和溯源原因！");
     }
 
     try {
@@ -592,7 +660,7 @@ async function traceViolation() {
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({ pid, reason })
+            body: JSON.stringify({ order_id: orderId, reason })
         });
 
         const data = json.data || {};
@@ -614,24 +682,20 @@ async function traceViolation() {
 
         body.innerHTML = `
             <div class="alert alert-danger">
-                <strong>TRACE_SUCCESS</strong>
+                <strong>TRACE_SUCCESS</strong>：已按订单号触发条件溯源；PID 仍由后端内部维护，不在管理员页面展示。
             </div>
+            <div class="mb-2"><strong>触发订单号：</strong><span class="hash-text">${escapeHtml(orderId)}</span></div>
             <div class="mb-2"><strong>用户名：</strong>${escapeHtml(data.username)}</div>
             <div class="mb-2"><strong>用户ID：</strong>${escapeHtml(data.user_id)}</div>
-            <div class="mb-2"><strong>PID：</strong><span class="hash-text">${escapeHtml(data.pid)}</span></div>
             <div class="mb-2"><strong>注册时间：</strong>${escapeHtml(data.created_at)}</div>
             <div class="mb-2"><strong>关联订单：</strong></div>
             ${ordersHtml}
         `;
 
         card.style.display = "block";
-
-        if (orders.length > 0) {
-            document.getElementById("orderIdInput").value = orders[0].order_id;
-            await fetchAuditLogs(orders[0].order_id);
-        }
-
-        showAlert("success", "溯源成功，结果已展示。");
+        document.getElementById("orderIdInput").value = orderId;
+        await fetchAuditLogs(orderId);
+        showAlert("success", "溯源成功，结果已展示，并已写入审计日志。");
     } catch (e) {
         document.getElementById("traceResultCard").style.display = "none";
         showAlert("danger", `溯源请求失败：${escapeHtml(e.message)}`);

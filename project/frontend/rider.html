@@ -114,12 +114,25 @@
         <div class="col-lg-5">
             <div class="card step-card p-4">
                 <div class="step-title text-success mb-2">1. 查看待接订单</div>
-                <div class="section-tip mb-3">平台列出当前状态为 created 的待接订单。</div>
+                <div class="section-tip mb-3">平台列出订单任务。骑手端仅显示订单级匿名会话，不显示 PID、用户名或用户历史关联。</div>
+
+                <div class="input-group mb-2">
+                    <input id="riderOrderKeyword" type="text" class="form-control" placeholder="订单号 / 配送说明关键词">
+                    <select id="riderOrderStatus" class="form-select" style="max-width: 120px;">
+                        <option value="created">created</option>
+                        <option value="taken">taken</option>
+                        <option value="delivering">delivering</option>
+                        <option value="completed">completed</option>
+                        <option value="cancelled">cancelled</option>
+                        <option value="">全部</option>
+                    </select>
+                </div>
 
                 <div class="d-flex gap-2 flex-wrap mb-3">
                     <button id="refreshOrdersBtn" class="btn btn-success" onclick="loadPendingOrders()">
-                        刷新待接订单
+                        搜索/刷新订单
                     </button>
+                    <button class="btn btn-outline-secondary" onclick="resetRiderOrderSearch()">重置</button>
                 </div>
 
                 <div id="pendingOrdersBox">
@@ -186,15 +199,27 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-const BASE_URL = "http://127.0.0.1:5000";
-const RIDER_PID = "RIDER_DEMO_001";
+const BASE_URL = window.location.origin;
+const IS_FLASK_LOCAL = ["127.0.0.1", "localhost"].includes(window.location.hostname) && window.location.port === "5000";
 
-const socket = io(window.location.origin, {
-    path: "/socket.io",
-    transports: ["polling", "websocket"],
-    autoConnect: true,
-    reconnection: true
-});
+const socket = createSafeSocket();
+
+function createSafeSocket() {
+    const noopSocket = {
+        on: () => {},
+        emit: () => showAlert("warning", "当前不是 Flask 本地页面。请用浏览器打开 http://127.0.0.1:5000/rider.html 后再使用聊天功能。")
+    };
+    if (!IS_FLASK_LOCAL || typeof io === "undefined") {
+        console.warn("Preview/非 Flask 环境：已禁用 Socket.IO 自动连接，避免网络权限弹窗循环。");
+        return noopSocket;
+    }
+    return io(window.location.origin, {
+        path: "/socket.io",
+        transports: ["polling", "websocket"],
+        autoConnect: true,
+        reconnection: false
+    });
+}
 
 let hasJoinedChatRoom = false;
 let currentMerkleRoot = null;
@@ -276,7 +301,7 @@ function appendMessage(msg) {
         const roleText = roleTextMap[role] || role;
         div.className = `chat-message ${role}`;
         div.innerHTML = `
-            <div class="chat-meta">${roleText}${msg.sender_pid ? `（${escapeHtml(msg.sender_pid)}）` : ""} · ${msg.timestamp || ""}</div>
+            <div class="chat-meta">${roleText} · ${msg.timestamp || ""}</div>
             <div class="chat-content">${escapeHtml(msg.content || "")}</div>
         `;
     }
@@ -299,7 +324,6 @@ function renderHistory(messages) {
             type: "chat",
             msg_id: msg.msg_id,
             order_id: msg.order_id,
-            sender_pid: msg.sender_pid,
             role: msg.role,
             content: msg.content,
             timestamp: msg.timestamp
@@ -308,43 +332,75 @@ function renderHistory(messages) {
 }
 
 async function loadPendingOrders() {
-    setButtonLoading("refreshOrdersBtn", "刷新中...", true);
+    setButtonLoading("refreshOrdersBtn", "搜索中...", true);
 
     try {
-        const res = await fetch(`${BASE_URL}/get_pending_orders`);
+        const keyword = document.getElementById("riderOrderKeyword")?.value.trim() || "";
+        const status = document.getElementById("riderOrderStatus")?.value || "";
+        const params = new URLSearchParams();
+        if (keyword) params.set("keyword", keyword);
+        if (status) params.set("status", status);
+
+        const res = await fetch(`${BASE_URL}/rider/orders/search${params.toString() ? "?" + params.toString() : ""}`);
         const result = await res.json();
 
         const box = document.getElementById("pendingOrdersBox");
 
         if (!result.success) {
-            box.innerHTML = `<div class="result-box text-danger">${escapeHtml(result.message || "获取待接订单失败。")}</div>`;
+            box.innerHTML = `<div class="result-box text-danger">${escapeHtml(result.message || "获取订单失败。")}</div>`;
             return;
         }
 
         const orders = result.data || [];
         if (orders.length === 0) {
-            box.innerHTML = `<div class="result-box text-muted">当前没有待接订单。</div>`;
+            box.innerHTML = `<div class="result-box text-muted">未找到匹配订单。</div>`;
             return;
         }
 
         box.innerHTML = orders.map(order => `
             <div class="order-card">
                 <div class="fw-semibold mb-1">订单号：${escapeHtml(order.order_id)}</div>
-                <div class="order-meta mb-2">用户 PID：${escapeHtml(order.pid || "")}</div>
+                <div class="order-meta mb-1">订单匿名会话：<strong>${escapeHtml(order.order_alias || "Guest-UNKNOWN")}</strong></div>
+                <div class="order-meta mb-1">隐私边界：不展示 PID / 用户名 / 用户历史关联</div>
+                <div class="order-meta mb-2">配送说明：${escapeHtml(order.delivery_note || "无")}</div>
+                <div class="order-meta mb-2">创建时间：${escapeHtml(order.created_at || "-")}</div>
                 <div class="mb-2">
                     <span class="badge text-bg-secondary">${escapeHtml(order.status || "unknown")}</span>
                 </div>
-                <button class="btn btn-success btn-sm" onclick="handleTakeOrder('${escapeHtml(order.order_id)}')">
-                    接单并准备进入聊天
-                </button>
+                ${order.status === "created" ? `
+                    <button class="btn btn-success btn-sm" onclick="handleTakeOrder('${escapeHtml(order.order_id)}')">
+                        接单并准备进入聊天
+                    </button>
+                ` : `
+                    <button class="btn btn-outline-primary btn-sm" onclick="selectRiderOrder('${escapeHtml(order.order_id)}', '${escapeHtml(order.status || "") }')">
+                        选择该订单
+                    </button>
+                `}
             </div>
         `).join("");
 
     } catch (error) {
-        showAlert("danger", "获取待接订单失败，请检查后端是否启动。");
+        showAlert("danger", "获取订单失败，请检查后端是否启动。");
     } finally {
-        setButtonLoading("refreshOrdersBtn", "刷新中...", false);
+        setButtonLoading("refreshOrdersBtn", "搜索中...", false);
     }
+}
+
+function resetRiderOrderSearch() {
+    const keywordInput = document.getElementById("riderOrderKeyword");
+    const statusInput = document.getElementById("riderOrderStatus");
+    if (keywordInput) keywordInput.value = "";
+    if (statusInput) statusInput.value = "created";
+    loadPendingOrders();
+}
+
+function selectRiderOrder(orderId, status) {
+    updateCurrentOrder(orderId, status || "taken");
+    document.getElementById("joinChatBtn").disabled = false;
+    hasJoinedChatRoom = false;
+    enableChatInput(false);
+    updateChatStatus("已选择订单，请进入聊天房间。", "secondary");
+    document.getElementById("chatMessages").innerHTML = "";
 }
 
 async function handleTakeOrder(orderId) {
@@ -446,7 +502,6 @@ function handleSendMessage() {
 
     socket.emit("send_message", {
         order_id: orderId,
-        sender_pid: RIDER_PID,
         role: "rider",
         content
     });

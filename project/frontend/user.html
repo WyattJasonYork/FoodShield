@@ -3,112 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>用户端 - 匿名外卖</title>
+    <title>用户端 - FoodShield</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="/css/style.css" rel="stylesheet">
     <style>
-        body {
-            background: #f5f7fb;
-        }
-        .navbar {
-            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-        }
-        .page-title {
-            font-weight: 700;
-            letter-spacing: 1px;
-        }
-        .step-card {
-            border: none;
-            border-radius: 18px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.06);
-            height: 100%;
-        }
-        .step-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-        }
-        .result-box {
-            background: #f8f9fa;
-            border: 1px solid #e9ecef;
-            border-radius: 12px;
-            padding: 12px;
-            min-height: 56px;
-            word-break: break-all;
-        }
-        .kv-row {
-            padding: 10px 0;
-            border-bottom: 1px dashed #dee2e6;
-        }
-        .kv-row:last-child {
-            border-bottom: none;
-        }
-        .kv-key {
-            font-weight: 600;
-            color: #495057;
-            margin-bottom: 4px;
-        }
-        .kv-value {
-            color: #212529;
-            word-break: break-all;
-        }
-        .badge-status {
-            font-size: 0.95rem;
-            padding: 0.5em 0.8em;
-        }
-        .btn-copy {
-            font-size: 0.85rem;
-        }
-        .section-tip {
-            font-size: 0.92rem;
-            color: #6c757d;
-        }
-        .verify-pass {
-            color: #198754;
-            font-weight: 700;
-        }
-        .verify-fail {
-            color: #dc3545;
-            font-weight: 700;
-        }
-        .chat-message {
-            border-radius: 12px;
-            padding: 10px 12px;
-            margin-bottom: 10px;
-            border: 1px solid #e9ecef;
-            background: #fff;
-        }
-        .chat-message.user {
-            border-left: 4px solid #0d6efd;
-        }
-        .chat-message.rider {
-            border-left: 4px solid #198754;
-        }
-        .chat-message.system {
-            background: #f8f9fa;
-            border-left: 4px solid #6c757d;
-        }
-        .chat-meta {
-            font-size: 0.85rem;
-            color: #6c757d;
-            margin-bottom: 4px;
-        }
-        .chat-content {
-            color: #212529;
-            white-space: pre-wrap;
-            word-break: break-word;
-        }
-        #chatMessages {
-            min-height: 260px;
-            max-height: 420px;
-            overflow-y: auto;
-            background: #ffffff;
-        }
+        body { background: #f5f7fb; }
+        .navbar { box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+        .page-title { font-weight: 700; letter-spacing: 1px; }
+        .step-card { border: none; border-radius: 18px; box-shadow: 0 8px 24px rgba(0,0,0,0.06); height: 100%; }
+        .step-title { font-size: 1.45rem; font-weight: 700; }
+        .result-box { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 12px; padding: 12px; min-height: 54px; word-break: break-all; }
+        .kv-row { padding: 10px 0; border-bottom: 1px dashed #dee2e6; }
+        .kv-row:last-child { border-bottom: none; }
+        .kv-key { font-weight: 600; color: #495057; margin-bottom: 4px; }
+        .section-tip { font-size: 0.92rem; color: #6c757d; }
+        .badge-status { font-size: 0.95rem; padding: 0.5em 0.8em; }
+        .verify-pass { color: #198754; font-weight: 700; }
+        .verify-fail { color: #dc3545; font-weight: 700; }
+        .chat-message { border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; border: 1px solid #e9ecef; background: #fff; }
+        .chat-message.user { border-left: 4px solid #0d6efd; }
+        .chat-message.rider { border-left: 4px solid #198754; }
+        .chat-message.system { background: #f8f9fa; border-left: 4px solid #6c757d; }
+        .chat-meta { font-size: 0.85rem; color: #6c757d; margin-bottom: 4px; }
+        .chat-content { color: #212529; white-space: pre-wrap; word-break: break-word; }
+        #chatMessages { min-height: 260px; max-height: 420px; overflow-y: auto; background: #ffffff; }
+        .order-history-card { border: 1px solid #e9ecef; border-radius: 12px; padding: 12px; margin-bottom: 10px; background: #fff; }
     </style>
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container">
-        <a class="navbar-brand fw-bold" href="/">🍔 匿名外卖</a>
+        <a class="navbar-brand fw-bold" href="/">🍔 FoodShield</a>
         <div class="navbar-nav ms-auto">
             <a class="nav-link active" href="/user.html">用户端</a>
             <a class="nav-link" href="/rider.html">骑手端</a>
@@ -120,186 +45,130 @@
 <div class="container py-4">
     <div class="mb-4">
         <h2 class="page-title">用户端 · 匿名订单认证流程演示</h2>
-        <div class="text-muted">按顺序完成：注册 → 创建订单 → 验证订单认证信息 → 进入匿名聊天</div>
+        <div class="text-muted">按顺序完成：注册/登录 → 创建订单 → 认证验证 → 匿名聊天。PID 由后端维护，用户端默认不展示。</div>
     </div>
 
     <div id="alertBox"></div>
 
     <div class="row g-4">
-        <!-- 1 登录/注册 -->
         <div class="col-lg-4">
             <div class="card step-card p-4">
                 <div class="step-title text-primary mb-2">1. 登录 / 注册</div>
-                <div class="section-tip mb-3" id="loginStatus">请先登录或注册。</div>
+                <div class="section-tip mb-3" id="loginStatus">正在检查登录状态...</div>
 
-                <!-- 登录表单 -->
                 <div id="loginForm">
-                    <div class="mb-2">
-                        <input id="loginUsername" type="text" class="form-control" placeholder="用户名">
-                    </div>
-                    <div class="mb-2">
-                        <input id="loginPassword" type="password" class="form-control" placeholder="密码">
-                    </div>
-                    <div class="d-grid mb-2">
-                        <button id="loginBtn" class="btn btn-primary" onclick="handleLogin()">登录</button>
-                    </div>
-                    <div class="text-center">
-                        <a href="#" class="text-muted small" onclick="showRegisterForm(); return false;">没有账号？点击注册</a>
-                    </div>
+                    <div class="mb-2"><input id="loginUsername" type="text" class="form-control" placeholder="用户名"></div>
+                    <div class="mb-2"><input id="loginPassword" type="password" class="form-control" placeholder="密码"></div>
+                    <div class="d-grid mb-2"><button id="loginBtn" class="btn btn-primary" onclick="handleLogin()">登录</button></div>
+                    <div class="text-center"><a href="#" class="text-muted small" onclick="showRegisterForm(); return false;">没有账号？点击注册</a></div>
                 </div>
 
-                <!-- 注册表单（默认隐藏） -->
                 <div id="registerForm" style="display:none;">
-                    <div class="mb-2">
-                        <input id="regUsername" type="text" class="form-control" placeholder="用户名">
-                    </div>
-                    <div class="mb-2">
-                        <input id="regPassword" type="password" class="form-control" placeholder="密码（至少6位）">
-                    </div>
-                    <div class="mb-2">
-                        <input id="regConfirmPassword" type="password" class="form-control" placeholder="确认密码">
-                    </div>
-                    <!-- 验证码 -->
+                    <div class="mb-2"><input id="regUsername" type="text" class="form-control" placeholder="用户名"></div>
+                    <div class="mb-2"><input id="regPassword" type="password" class="form-control" placeholder="密码（至少6位）"></div>
+                    <div class="mb-2"><input id="regConfirmPassword" type="password" class="form-control" placeholder="确认密码"></div>
                     <div class="mb-2 input-group">
                         <input id="regCaptcha" type="text" class="form-control" placeholder="验证码答案">
                         <button id="captchaBtn" class="btn btn-outline-secondary" type="button" onclick="refreshCaptcha()">获取验证码</button>
                     </div>
                     <div id="captchaQuestion" class="section-tip mb-2 text-center" style="display:none;"></div>
-                    <div class="d-grid mb-2">
-                        <button id="registerBtn" class="btn btn-success" onclick="handleRegister()">注册</button>
-                    </div>
-                    <div class="text-center">
-                        <a href="#" class="text-muted small" onclick="showLoginForm(); return false;">已有账号？返回登录</a>
-                    </div>
+                    <div class="d-grid mb-2"><button id="registerBtn" class="btn btn-success" onclick="handleRegister()">注册</button></div>
+                    <div class="text-center"><a href="#" class="text-muted small" onclick="showLoginForm(); return false;">已有账号？返回登录</a></div>
+                </div>
+
+                <div id="loggedInBox" style="display:none;">
+                    <div class="alert alert-success mb-2">已登录：<strong id="currentUsernameText"></strong></div>
+                    <div class="alert alert-info small mb-2">匿名身份 PID 已由平台后端生成并绑定，不在用户端明文展示。</div>
+                    <button class="btn btn-outline-secondary btn-sm w-100" onclick="handleLogout()">退出登录</button>
                 </div>
             </div>
         </div>
 
-        <!-- 2 创建订单 -->
         <div class="col-lg-4">
             <div class="card step-card p-4">
                 <div class="step-title text-success mb-2">2. 创建订单</div>
-                <div class="section-tip mb-3">输入或自动填充 PID，创建订单并生成 token。</div>
-
+                <div class="section-tip mb-3">必须登录后创建订单。前端不再提交 PID，后端从 session 绑定用户。</div>
+                <div class="mb-2">
+                    <label class="form-label">订单备注（用户可见，管理员默认不展示）</label>
+                    <input id="remarkInput" type="text" class="form-control" placeholder="例如：请放宿舍楼下">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label">订单标签（用户端私有检索字段）</label>
+                    <input id="tagInput" type="text" class="form-control" placeholder="例如：宿舍 / 教学楼 / 加急">
+                </div>
                 <div class="mb-3">
-                    <label for="pidInput" class="form-label">当前 PID</label>
-                    <input id="pidInput" type="text" class="form-control" placeholder="注册后会自动填充">
+                    <label class="form-label">配送说明（骑手可见，不等同于用户标签）</label>
+                    <input id="deliveryNoteInput" type="text" class="form-control" placeholder="例如：送到宿舍楼下，电话联系">
                 </div>
 
-                <div class="d-grid mb-3">
-                    <button id="createBtn" class="btn btn-success btn-lg" onclick="handleCreateOrder()">创建订单</button>
-                </div>
+                <div class="d-grid mb-3"><button id="createBtn" class="btn btn-success btn-lg" onclick="handleCreateOrder()" disabled>创建订单</button></div>
 
-                <div class="kv-row">
-                    <div class="kv-key">订单号</div>
-                    <div id="orderIdBox" class="result-box">尚未生成</div>
-                </div>
-
-                <div class="kv-row">
-                    <div class="kv-key">时间戳</div>
-                    <div id="timestampBox" class="result-box">尚未生成</div>
-                </div>
-
-                <div class="kv-row">
-                    <div class="kv-key">Token</div>
-                    <div id="tokenBox" class="result-box">尚未生成</div>
-                    <div class="mt-2 d-flex gap-2 flex-wrap">
-                        <button class="btn btn-outline-secondary btn-sm btn-copy" onclick="copyText('orderIdBox')">复制订单号</button>
-                        <button class="btn btn-outline-secondary btn-sm btn-copy" onclick="copyText('tokenBox')">复制 Token</button>
-                    </div>
-                </div>
-
-                <div class="kv-row">
-                    <div class="kv-key">订单状态</div>
-                    <div>
-                        <span id="statusBadge" class="badge text-bg-secondary badge-status">未创建</span>
-                    </div>
-                </div>
+                <div class="kv-row"><div class="kv-key">订单号</div><div id="orderIdBox" class="result-box">尚未生成</div></div>
+                <div class="kv-row"><div class="kv-key">时间戳</div><div id="timestampBox" class="result-box">尚未生成</div></div>
+                <div class="kv-row"><div class="kv-key">Token</div><div id="tokenBox" class="result-box">尚未生成</div></div>
+                <div class="kv-row"><div class="kv-key">订单状态</div><span id="statusBadge" class="badge text-bg-secondary badge-status">未创建</span></div>
             </div>
         </div>
 
-        <!-- 3 验证订单 -->
         <div class="col-lg-4">
             <div class="card step-card p-4">
                 <div class="step-title text-dark mb-2">3. 验证订单</div>
-                <div class="section-tip mb-3">自动读取订单认证信息，校验 token 是否有效。</div>
-
-                <div class="mb-2">
-                    <label class="form-label">订单号</label>
-                    <input id="verifyOrderId" type="text" class="form-control" readonly>
-                </div>
-
-                <div class="mb-2">
-                    <label class="form-label">PID</label>
-                    <input id="verifyPid" type="text" class="form-control" readonly>
-                </div>
-
-                <div class="mb-2">
-                    <label class="form-label">时间戳</label>
-                    <input id="verifyTimestamp" type="text" class="form-control" readonly>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label">Token</label>
-                    <textarea id="verifyToken" class="form-control" rows="3" readonly></textarea>
-                </div>
-
-                <div class="d-grid mb-3">
-                    <button id="verifyBtn" class="btn btn-dark btn-lg" onclick="handleVerifyOrder()">验证订单认证信息</button>
-                </div>
-
-                <div class="kv-row">
-                    <div class="kv-key">验证结果</div>
-                    <div id="verifyResult" class="result-box">尚未验证</div>
-                </div>
-
-                <div class="mt-3 d-grid">
-                    <button class="btn btn-outline-danger" onclick="handleFakeVerify()">模拟篡改 Token 后验证</button>
-                </div>
+                <div class="section-tip mb-3">验证 token 是否属于当前登录用户创建的订单。PID 不在页面展示。</div>
+                <div class="mb-2"><label class="form-label">订单号</label><input id="verifyOrderId" type="text" class="form-control" readonly></div>
+                <div class="mb-2"><label class="form-label">时间戳</label><input id="verifyTimestamp" type="text" class="form-control" readonly></div>
+                <div class="mb-3"><label class="form-label">Token</label><textarea id="verifyToken" class="form-control" rows="3" readonly></textarea></div>
+                <div class="d-grid mb-3"><button id="verifyBtn" class="btn btn-dark btn-lg" onclick="handleVerifyOrder()">验证订单认证信息</button></div>
+                <div class="kv-row"><div class="kv-key">验证结果</div><div id="verifyResult" class="result-box">尚未验证</div></div>
+                <div class="mt-3 d-grid"><button class="btn btn-outline-danger" onclick="handleFakeVerify()">模拟篡改 Token 后验证</button></div>
             </div>
         </div>
     </div>
 
-    <!-- 4 匿名聊天 -->
     <div class="row g-4 mt-1">
-        <div class="col-12">
+        <div class="col-lg-4">
             <div class="card step-card p-4">
-                <div class="step-title text-warning mb-2">4. 进入匿名聊天</div>
-                <div class="section-tip mb-3">
-                    认证通过后，可进入该订单对应的匿名通信房间，与骑手进行实时交流。
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="step-title text-info">4. 我的订单历史</div>
+                    <button class="btn btn-sm btn-outline-info" onclick="loadMyOrders()">刷新</button>
                 </div>
+                <div class="section-tip mb-3">只显示当前登录用户自己的订单。支持按订单号、备注、标签搜索；管理员端看不到备注和标签。</div>
+                <div class="input-group mb-2">
+                    <input id="myOrderKeyword" type="text" class="form-control" placeholder="订单号 / 备注 / 标签">
+                    <select id="myOrderStatus" class="form-select" style="max-width: 120px;">
+                        <option value="">全部状态</option>
+                        <option value="created">created</option>
+                        <option value="taken">taken</option>
+                        <option value="delivering">delivering</option>
+                        <option value="completed">completed</option>
+                        <option value="cancelled">cancelled</option>
+                    </select>
+                </div>
+                <div class="d-flex gap-2 mb-3">
+                    <button class="btn btn-sm btn-info text-white" onclick="loadMyOrders()">搜索</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="resetMyOrderSearch()">重置</button>
+                </div>
+                <div id="orderHistoryBox" class="result-box text-muted">登录后显示订单历史。</div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card step-card p-4">
+                <div class="step-title text-warning mb-2">5. 进入匿名聊天</div>
+                <div class="section-tip mb-3">认证通过后进入订单房间，与骑手实时通信。聊天界面不展示 PID。</div>
 
                 <div class="d-flex gap-2 flex-wrap mb-3">
-                    <button id="joinChatBtn" class="btn btn-warning btn-lg text-dark" onclick="handleJoinChat()">
-                        进入聊天房间
-                    </button>
-                    <button class="btn btn-outline-secondary" onclick="loadMessageHistory()">
-                        刷新历史消息
-                    </button>
+                    <button id="joinChatBtn" class="btn btn-warning btn-lg text-dark" onclick="handleJoinChat()">进入聊天房间</button>
+                    <button class="btn btn-outline-secondary" onclick="loadMessageHistory()">刷新历史消息</button>
                 </div>
 
-                <div class="kv-row">
-                    <div class="kv-key">聊天状态</div>
-                    <div id="chatStatusBox" class="result-box">尚未进入聊天房间</div>
-                </div>
-
-                <div class="mt-3">
-                    <label class="form-label">聊天记录</label>
-                    <div id="chatMessages" class="result-box"></div>
-                </div>
-
+                <div class="kv-row"><div class="kv-key">聊天状态</div><div id="chatStatusBox" class="result-box">尚未进入聊天房间</div></div>
+                <div class="mt-3"><label class="form-label">聊天记录</label><div id="chatMessages" class="result-box"></div></div>
                 <div class="mt-3">
                     <label for="chatInput" class="form-label">发送消息</label>
                     <div class="input-group">
                         <input id="chatInput" type="text" class="form-control" placeholder="例如：骑手您好，请放宿舍楼下。">
-                        <button id="sendMsgBtn" class="btn btn-warning text-dark" onclick="handleSendMessage()" disabled>
-                            发送
-                        </button>
+                        <button id="sendMsgBtn" class="btn btn-warning text-dark" onclick="handleSendMessage()" disabled>发送</button>
                     </div>
-                </div>
-
-                <div class="section-tip mt-2">
-                    当前阶段为第三周最小通信骨架：用户可认证进房间、发送消息、查看历史消息。
                 </div>
             </div>
         </div>
@@ -308,23 +177,35 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-const BASE_URL = "http://127.0.0.1:5000";
-const socket = io(BASE_URL, {
-    transports: ["websocket", "polling"]
-});
+const BASE_URL = window.location.origin;
+const IS_FLASK_LOCAL = ["127.0.0.1", "localhost"].includes(window.location.hostname) && window.location.port === "5000";
+const socket = createSafeSocket();
 
+let currentUser = null;
 let hasJoinedChatRoom = false;
 let currentMerkleRoot = null;
 let currentOrderId = "";
 
+function createSafeSocket() {
+    const noopSocket = {
+        on: () => {},
+        emit: () => showAlert("warning", "当前不是 Flask 本地页面。请用浏览器打开 http://127.0.0.1:5000/user.html 后再使用聊天功能。")
+    };
+    if (!IS_FLASK_LOCAL || typeof io === "undefined") {
+        console.warn("Preview/非 Flask 环境：已禁用 Socket.IO 自动连接，避免网络权限弹窗循环。")
+        return noopSocket;
+    }
+    return io(window.location.origin, {
+        path: "/socket.io",
+        transports: ["polling", "websocket"],
+        autoConnect: true,
+        reconnection: false
+    });
+}
+
 function showAlert(type, message) {
     const alertBox = document.getElementById("alertBox");
-    alertBox.innerHTML = `
-        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    `;
+    alertBox.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show" role="alert">${escapeHtml(message)}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>`;
 }
 
 function setButtonLoading(buttonId, loadingText, isLoading) {
@@ -340,96 +221,36 @@ function setButtonLoading(buttonId, loadingText, isLoading) {
     }
 }
 
-function copyText(elementId) {
-    const text = document.getElementById(elementId).innerText.trim();
-    if (!text || text === "尚未生成") {
-        showAlert("warning", "当前没有可复制的内容。");
-        return;
-    }
-    navigator.clipboard.writeText(text)
-        .then(() => showAlert("success", "复制成功。"))
-        .catch(() => showAlert("danger", "复制失败，请手动复制。"));
+function escapeHtml(str) {
+    return String(str ?? "")
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
-function fillVerifyFields(order_id, pid, timestamp, token) {
+async function getMachineFingerprint() {
+    const raw = [navigator.userAgent, navigator.language, navigator.platform, Intl.DateTimeFormat().resolvedOptions().timeZone, screen.width + "x" + screen.height].join("|");
+    if (window.crypto && crypto.subtle) {
+        const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
+        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+    }
+    return btoa(unescape(encodeURIComponent(raw))).slice(0, 64);
+}
+
+function fillVerifyFields(order_id, timestamp, token) {
     document.getElementById("verifyOrderId").value = order_id || "";
-    document.getElementById("verifyPid").value = pid || "";
     document.getElementById("verifyTimestamp").value = timestamp || "";
     document.getElementById("verifyToken").value = token || "";
-}
-
-async function checkSession() {
-    try {
-        const res = await fetch(`${BASE_URL}/user/session`);
-        const result = await res.json();
-        if (result.success && result.data.logged_in) {
-            localStorage.setItem("user_id", result.data.user_id);
-            localStorage.setItem("username", result.data.username);
-            localStorage.setItem("pid", result.data.pid);
-            document.getElementById("pidInput").value = result.data.pid;
-            onLoginSuccess(result.data);
-        }
-    } catch (e) {
-        // Server not ready, use localStorage
-        const uname = localStorage.getItem("username");
-        if (uname) {
-            document.getElementById("loginStatus").innerText = "离线模式";
-        }
-    }
-}
-
-function saveOrderData(data) {
-    localStorage.setItem("pid", data.pid);
-    localStorage.setItem("order_id", data.order_id);
-    localStorage.setItem("timestamp", data.timestamp);
-    localStorage.setItem("token", data.token);
-}
-
-function loadLocalData() {
-    const pid = localStorage.getItem("pid") || "";
-    const order_id = localStorage.getItem("order_id") || "";
-    const timestamp = localStorage.getItem("timestamp") || "";
-    const token = localStorage.getItem("token") || "";
-
-    if (pid) {
-        document.getElementById("pidInput").value = pid;
-    }
-    fillVerifyFields(order_id, pid, timestamp, token);
-
-    if (order_id) document.getElementById("orderIdBox").innerText = order_id;
-    if (timestamp) document.getElementById("timestampBox").innerText = timestamp;
-    if (token) document.getElementById("tokenBox").innerText = token;
-
-    const savedStatus = localStorage.getItem("status");
-    if (savedStatus) {
-        updateStatusBadge(savedStatus);
-    }
 }
 
 function updateStatusBadge(status) {
     const badge = document.getElementById("statusBadge");
     badge.innerText = status || "未知";
     badge.className = "badge badge-status";
-    if (status === "created" || status === "taken" || status === "delivering" || status === "completed") {
-        badge.classList.add("text-bg-success");
-    } else {
-        badge.classList.add("text-bg-secondary");
-    }
-    localStorage.setItem("status", status || "");
+    badge.classList.add(["created", "taken", "delivering", "completed"].includes(status) ? "text-bg-success" : "text-bg-secondary");
 }
 
 function updateChatStatus(message, type = "secondary") {
-    const box = document.getElementById("chatStatusBox");
-    box.innerHTML = `<span class="text-${type}">${message}</span>`;
-}
-
-function escapeHtml(str) {
-    return String(str)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+    document.getElementById("chatStatusBox").innerHTML = `<span class="text-${type}">${escapeHtml(message)}</span>`;
 }
 
 function enableChatInput(enabled) {
@@ -437,78 +258,53 @@ function enableChatInput(enabled) {
     document.getElementById("chatInput").disabled = !enabled;
 }
 
-function appendMessage(msg) {
-    const container = document.getElementById("chatMessages");
-    if (!container) return;
-
-    const div = document.createElement("div");
-
-    if (msg.type === "system") {
-        div.className = "chat-message system";
-        div.innerHTML = `
-            <div class="chat-meta">系统消息 · ${msg.timestamp || ""}</div>
-            <div class="chat-content">${escapeHtml(msg.message || "")}</div>
-        `;
-    } else {
-        const role = msg.role || "unknown";
-        const roleTextMap = {
-            user: "用户",
-            rider: "骑手",
-            admin: "管理员"
-        };
-        const roleText = roleTextMap[role] || role;
-        div.className = `chat-message ${role}`;
-        div.innerHTML = `
-            <div class="chat-meta">${roleText}${msg.sender_pid ? `（${escapeHtml(msg.sender_pid)}）` : ""} · ${msg.timestamp || ""}</div>
-            <div class="chat-content">${escapeHtml(msg.content || "")}</div>
-        `;
-    }
-
-    container.appendChild(div);
-    container.scrollTop = container.scrollHeight;
+function setAuthUI(loggedIn, user = null) {
+    currentUser = loggedIn ? user : null;
+    document.getElementById("createBtn").disabled = !loggedIn;
+    document.getElementById("loginForm").style.display = loggedIn ? "none" : "block";
+    document.getElementById("registerForm").style.display = "none";
+    document.getElementById("loggedInBox").style.display = loggedIn ? "block" : "none";
+    document.getElementById("loginStatus").innerText = loggedIn ? "已登录，可创建订单。" : "请先登录或注册。";
+    document.getElementById("currentUsernameText").innerText = loggedIn ? user.username : "";
 }
 
-function renderHistory(messages) {
-    const container = document.getElementById("chatMessages");
-    container.innerHTML = "";
-
-    if (!messages || messages.length === 0) {
-        container.innerHTML = `<div class="text-muted">暂无历史消息。</div>`;
-        return;
-    }
-
-    messages.forEach(msg => {
-        appendMessage({
-            type: "chat",
-            msg_id: msg.msg_id,
-            order_id: msg.order_id,
-            sender_pid: msg.sender_pid,
-            role: msg.role,
-            content: msg.content,
-            timestamp: msg.timestamp
-        });
-    });
-}
-
-async function loadMessageHistory() {
-    const order_id = document.getElementById("verifyOrderId").value.trim();
-
-    if (!order_id) {
-        showAlert("warning", "请先创建订单。");
-        return;
-    }
-
+async function checkSession() {
     try {
-        const res = await fetch(`${BASE_URL}/get_message_history/${order_id}`);
+        const res = await fetch(`${BASE_URL}/user/session`, { credentials: "include" });
         const result = await res.json();
+        if (result.success && result.data.logged_in) {
+            setAuthUI(true, result.data);
+            await loadMyOrders();
+            return;
+        }
+    } catch (e) {
+        console.warn(e);
+    }
+    setAuthUI(false);
+    document.getElementById("orderHistoryBox").innerHTML = "登录后显示订单历史。";
+}
 
+function showRegisterForm() {
+    document.getElementById("loginForm").style.display = "none";
+    document.getElementById("registerForm").style.display = "block";
+    refreshCaptcha();
+}
+
+function showLoginForm() {
+    document.getElementById("loginForm").style.display = "block";
+    document.getElementById("registerForm").style.display = "none";
+}
+
+async function refreshCaptcha() {
+    try {
+        const res = await fetch(`${BASE_URL}/captcha`, { credentials: "include" });
+        const result = await res.json();
         if (result.success) {
-            renderHistory(result.data || []);
-        } else {
-            showAlert("danger", result.message || "拉取历史消息失败。");
+            document.getElementById("captchaQuestion").innerText = result.data.question;
+            document.getElementById("captchaQuestion").style.display = "block";
         }
     } catch (error) {
-        showAlert("danger", "拉取历史消息失败，请检查后端是否启动。");
+        showAlert("danger", "获取验证码失败，请确认后端已启动。");
     }
 }
 
@@ -518,35 +314,29 @@ async function handleRegister() {
     const confirmPassword = document.getElementById("regConfirmPassword").value;
     const captchaAnswer = document.getElementById("regCaptcha").value.trim();
 
-    if (!username) { showAlert("warning", "请输入用户名。"); return; }
-    if (!password) { showAlert("warning", "请输入密码。"); return; }
-    if (password.length < 6) { showAlert("warning", "密码长度不能少于 6 位。"); return; }
-    if (password !== confirmPassword) { showAlert("warning", "两次密码输入不一致。"); return; }
-    if (!captchaAnswer) { showAlert("warning", "请输入验证码答案。"); return; }
+    if (!username) return showAlert("warning", "请输入用户名。");
+    if (!password) return showAlert("warning", "请输入密码。");
+    if (password.length < 6) return showAlert("warning", "密码长度不能少于 6 位。");
+    if (password !== confirmPassword) return showAlert("warning", "两次密码输入不一致。");
+    if (!captchaAnswer) return showAlert("warning", "请输入验证码答案。");
 
     setButtonLoading("registerBtn", "注册中...", true);
-
     try {
+        const machine_fp = await getMachineFingerprint();
         const res = await fetch(`${BASE_URL}/register`, {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({
-                username,
-                password,
-                confirm_password: confirmPassword,
-                captcha_answer: captchaAnswer
-            })
+            credentials: "include",
+            body: JSON.stringify({ username, password, confirm_password: confirmPassword, captcha_answer: captchaAnswer, machine_fp })
         });
-
         const result = await res.json();
-
         if (result.success) {
-            localStorage.setItem("user_id", result.data.user_id);
-            localStorage.setItem("username", result.data.username);
-            onLoginSuccess(result.data);
-            showAlert("success", "注册成功！");
+            setAuthUI(true, result.data);
+            await loadMyOrders();
+            showAlert("success", "注册成功，匿名身份已由后端生成。PID 不在用户端展示。");
         } else {
             showAlert("danger", result.message || "注册失败。");
+            refreshCaptcha();
         }
     } catch (error) {
         showAlert("danger", "请求失败，请检查后端是否启动。");
@@ -558,28 +348,23 @@ async function handleRegister() {
 async function handleLogin() {
     const username = document.getElementById("loginUsername").value.trim();
     const password = document.getElementById("loginPassword").value;
-
-    if (!username) { showAlert("warning", "请输入用户名。"); return; }
-    if (!password) { showAlert("warning", "请输入密码。"); return; }
+    if (!username) return showAlert("warning", "请输入用户名。");
+    if (!password) return showAlert("warning", "请输入密码。");
 
     setButtonLoading("loginBtn", "登录中...", true);
-
     try {
+        const machine_fp = await getMachineFingerprint();
         const res = await fetch(`${BASE_URL}/login`, {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ username, password })
+            credentials: "include",
+            body: JSON.stringify({ username, password, machine_fp })
         });
-
         const result = await res.json();
-
         if (result.success) {
-            localStorage.setItem("user_id", result.data.user_id);
-            localStorage.setItem("username", result.data.username);
-            localStorage.setItem("pid", result.data.pid);
-            document.getElementById("pidInput").value = result.data.pid;
-            onLoginSuccess(result.data);
-            showAlert("success", "登录成功！");
+            setAuthUI(true, result.data);
+            await loadMyOrders();
+            showAlert("success", "登录成功。");
         } else {
             showAlert("danger", result.message || "登录失败。");
         }
@@ -590,72 +375,46 @@ async function handleLogin() {
     }
 }
 
-async function refreshCaptcha() {
-    try {
-        const res = await fetch(`${BASE_URL}/captcha`);
-        const result = await res.json();
-        if (result.success) {
-            document.getElementById("captchaQuestion").innerText = result.data.question;
-            document.getElementById("captchaQuestion").style.display = "block";
-        }
-    } catch (error) {
-        showAlert("danger", "获取验证码失败。");
-    }
-}
-
-function showRegisterForm() {
-    document.getElementById("loginForm").style.display = "none";
-    document.getElementById("registerForm").style.display = "block";
-}
-
-function showLoginForm() {
-    document.getElementById("loginForm").style.display = "block";
-    document.getElementById("registerForm").style.display = "none";
-}
-
-function onLoginSuccess(data) {
-    document.getElementById("loginStatus").innerText = `已登录：${data.username}`;
-    document.getElementById("loginForm").style.display = "none";
-    document.getElementById("registerForm").style.display = "none";
-    document.getElementById("pidInput").value = localStorage.getItem("pid") || "";
+async function handleLogout() {
+    await fetch(`${BASE_URL}/logout`, { method: "POST", credentials: "include" });
+    setAuthUI(false);
+    fillVerifyFields("", "", "");
+    document.getElementById("orderIdBox").innerText = "尚未生成";
+    document.getElementById("timestampBox").innerText = "尚未生成";
+    document.getElementById("tokenBox").innerText = "尚未生成";
+    updateStatusBadge("未创建");
+    document.getElementById("orderHistoryBox").innerHTML = "登录后显示订单历史。";
+    showAlert("success", "已退出登录。");
 }
 
 async function handleCreateOrder() {
-    const pid = document.getElementById("pidInput").value.trim() || localStorage.getItem("pid");
-    if (!pid) {
-        showAlert("warning", "请先注册或输入 PID。");
-        return;
-    }
+    if (!currentUser) return showAlert("warning", "请先登录后再创建订单。");
 
     setButtonLoading("createBtn", "创建中...", true);
-
     try {
+        const remark = document.getElementById("remarkInput").value.trim();
+        const tag = document.getElementById("tagInput").value.trim();
+        const delivery_note = document.getElementById("deliveryNoteInput").value.trim();
         const res = await fetch(`${BASE_URL}/create_order`, {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ pid })
+            credentials: "include",
+            body: JSON.stringify({ remark, tag, delivery_note })
         });
-
         const result = await res.json();
-
         if (result.success) {
             const data = result.data;
-
             document.getElementById("orderIdBox").innerText = data.order_id;
             document.getElementById("timestampBox").innerText = data.timestamp;
             document.getElementById("tokenBox").innerText = data.token;
-            document.getElementById("pidInput").value = data.pid;
-
             updateStatusBadge(data.status);
-            saveOrderData(data);
-            fillVerifyFields(data.order_id, data.pid, data.timestamp, data.token);
-
+            fillVerifyFields(data.order_id, data.timestamp, data.token);
             hasJoinedChatRoom = false;
             enableChatInput(false);
-            updateChatStatus("订单已创建，请先进入聊天房间。", "secondary");
+            updateChatStatus("订单已创建，请先验证并进入聊天房间。", "secondary");
             document.getElementById("chatMessages").innerHTML = "";
-
-            showAlert("success", "订单创建成功，认证信息已生成。");
+            await loadMyOrders();
+            showAlert("success", "订单创建成功，认证信息已生成。注意：PID 未在页面展示。");
         } else {
             showAlert("danger", result.message || "创建订单失败。");
         }
@@ -668,31 +427,22 @@ async function handleCreateOrder() {
 
 async function handleVerifyOrder() {
     const order_id = document.getElementById("verifyOrderId").value.trim();
-    const pid = document.getElementById("verifyPid").value.trim();
     const timestamp = document.getElementById("verifyTimestamp").value.trim();
     const token = document.getElementById("verifyToken").value.trim();
-
-    if (!order_id || !pid || !timestamp || !token) {
-        showAlert("warning", "请先完成订单创建。");
-        return;
-    }
+    if (!order_id || !timestamp || !token) return showAlert("warning", "请先完成订单创建。");
 
     setButtonLoading("verifyBtn", "验证中...", true);
-
     try {
         const res = await fetch(`${BASE_URL}/verify_order`, {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ order_id, pid, timestamp, token })
+            credentials: "include",
+            body: JSON.stringify({ order_id, timestamp, token })
         });
-
         const result = await res.json();
-
         if (result.success) {
             const valid = result.data.valid;
-            document.getElementById("verifyResult").innerHTML = valid
-                ? `<span class="verify-pass">✅ 订单认证通过</span>`
-                : `<span class="verify-fail">❌ 订单认证失败</span>`;
+            document.getElementById("verifyResult").innerHTML = valid ? `<span class="verify-pass">✅ 订单认证通过</span>` : `<span class="verify-fail">❌ 订单认证失败</span>`;
             showAlert(valid ? "success" : "danger", valid ? "订单认证通过。" : "订单认证失败。");
         } else {
             showAlert("danger", result.message || "验证失败。");
@@ -706,31 +456,22 @@ async function handleVerifyOrder() {
 
 async function handleFakeVerify() {
     const order_id = document.getElementById("verifyOrderId").value.trim();
-    const pid = document.getElementById("verifyPid").value.trim();
     const timestamp = document.getElementById("verifyTimestamp").value.trim();
     const token = document.getElementById("verifyToken").value.trim();
-
-    if (!order_id || !pid || !timestamp || !token) {
-        showAlert("warning", "请先完成订单创建。");
-        return;
-    }
-
+    if (!order_id || !timestamp || !token) return showAlert("warning", "请先完成订单创建。");
     const fakeToken = token.slice(0, -1) + (token.slice(-1) === "0" ? "1" : "0");
 
     try {
         const res = await fetch(`${BASE_URL}/verify_order`, {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ order_id, pid, timestamp, token: fakeToken })
+            credentials: "include",
+            body: JSON.stringify({ order_id, timestamp, token: fakeToken })
         });
-
         const result = await res.json();
-
         if (result.success) {
             const valid = result.data.valid;
-            document.getElementById("verifyResult").innerHTML = valid
-                ? `<span class="verify-pass">⚠️ 篡改后仍通过（异常）</span>`
-                : `<span class="verify-fail">✅ 篡改后认证失败，校验有效</span>`;
+            document.getElementById("verifyResult").innerHTML = valid ? `<span class="verify-pass">⚠️ 篡改后仍通过（异常）</span>` : `<span class="verify-fail">✅ 篡改后认证失败，校验有效</span>`;
             showAlert(valid ? "warning" : "success", valid ? "异常：伪造 token 竟然通过了。" : "篡改 token 后验证失败，说明校验有效。");
         } else {
             showAlert("danger", result.message || "验证失败。");
@@ -740,51 +481,130 @@ async function handleFakeVerify() {
     }
 }
 
-async function handleJoinChat() {
-    const order_id = document.getElementById("verifyOrderId").value.trim();
-    const pid = document.getElementById("verifyPid").value.trim();
-    const timestamp = document.getElementById("verifyTimestamp").value.trim();
-    const token = document.getElementById("verifyToken").value.trim();
-
-    if (!order_id || !pid || !timestamp || !token) {
-        showAlert("warning", "请先完成订单创建与认证信息生成。");
+async function loadMyOrders() {
+    const box = document.getElementById("orderHistoryBox");
+    if (!currentUser) {
+        box.innerHTML = "登录后显示订单历史。";
         return;
     }
 
-    setButtonLoading("joinChatBtn", "进入中...", true);
+    const keyword = document.getElementById("myOrderKeyword")?.value.trim() || "";
+    const status = document.getElementById("myOrderStatus")?.value || "";
+    const params = new URLSearchParams();
+    if (keyword) params.set("keyword", keyword);
+    if (status) params.set("status", status);
 
+    try {
+        const url = `${BASE_URL}/my_orders/search${params.toString() ? "?" + params.toString() : ""}`;
+        const res = await fetch(url, { credentials: "include" });
+        const result = await res.json();
+        if (!result.success) {
+            box.innerHTML = `<div class="text-danger">${escapeHtml(result.message || "加载失败")}</div>`;
+            return;
+        }
+        const orders = result.data || [];
+        if (orders.length === 0) {
+            box.innerHTML = `<div class="text-muted">未找到匹配订单。</div>`;
+            return;
+        }
+        box.innerHTML = "";
+        orders.forEach(order => {
+            const div = document.createElement("div");
+            div.className = "order-history-card";
+            div.innerHTML = `
+                <div><strong>订单号：</strong><span class="small">${escapeHtml(order.order_id)}</span></div>
+                <div><strong>状态：</strong>${escapeHtml(order.status || "-")}</div>
+                <div><strong>备注：</strong>${escapeHtml(order.remark || "无")}</div>
+                <div><strong>标签：</strong>${escapeHtml(order.tag || "无")}</div>
+                <div><strong>配送说明：</strong>${escapeHtml(order.delivery_note || "无")}</div>
+                <div><strong>创建时间：</strong>${escapeHtml(order.created_at || "-")}</div>
+                <button class="btn btn-sm btn-outline-primary mt-2">使用该订单</button>
+            `;
+            div.querySelector("button").addEventListener("click", () => selectOrderFromHistory(order));
+            box.appendChild(div);
+        });
+    } catch (e) {
+        box.innerHTML = `<div class="text-danger">加载订单历史失败。</div>`;
+    }
+}
+
+function resetMyOrderSearch() {
+    const keywordInput = document.getElementById("myOrderKeyword");
+    const statusInput = document.getElementById("myOrderStatus");
+    if (keywordInput) keywordInput.value = "";
+    if (statusInput) statusInput.value = "";
+    loadMyOrders();
+}
+
+function selectOrderFromHistory(order) {
+    document.getElementById("orderIdBox").innerText = order.order_id;
+    document.getElementById("timestampBox").innerText = order.token_timestamp || "";
+    document.getElementById("tokenBox").innerText = order.token || "";
+    updateStatusBadge(order.status);
+    fillVerifyFields(order.order_id, order.token_timestamp, order.token);
+    showAlert("success", "已载入该订单认证信息。");
+}
+
+function appendMessage(msg) {
+    const container = document.getElementById("chatMessages");
+    const div = document.createElement("div");
+    if (msg.type === "system") {
+        div.className = "chat-message system";
+        div.innerHTML = `<div class="chat-meta">系统消息 · ${escapeHtml(msg.timestamp || "")}</div><div class="chat-content">${escapeHtml(msg.message || "")}</div>`;
+    } else {
+        const role = msg.role || "unknown";
+        const roleText = { user: "用户", rider: "骑手", admin: "管理员" }[role] || role;
+        div.className = `chat-message ${role}`;
+        div.innerHTML = `<div class="chat-meta">${escapeHtml(roleText)} · ${escapeHtml(msg.timestamp || "")}</div><div class="chat-content">${escapeHtml(msg.content || "")}</div>`;
+    }
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+}
+
+function renderHistory(messages) {
+    const container = document.getElementById("chatMessages");
+    container.innerHTML = "";
+    if (!messages || messages.length === 0) {
+        container.innerHTML = `<div class="text-muted">暂无历史消息。</div>`;
+        return;
+    }
+    messages.forEach(msg => appendMessage({ type: "chat", role: msg.role, content: msg.content, timestamp: msg.timestamp }));
+}
+
+async function loadMessageHistory() {
+    const order_id = document.getElementById("verifyOrderId").value.trim();
+    if (!order_id) return showAlert("warning", "请先创建或选择订单。");
+    try {
+        const res = await fetch(`${BASE_URL}/get_message_history/${encodeURIComponent(order_id)}`);
+        const result = await res.json();
+        if (result.success) renderHistory(result.data || []);
+        else showAlert("danger", result.message || "拉取历史消息失败。");
+    } catch (error) {
+        showAlert("danger", "拉取历史消息失败，请检查后端是否启动。");
+    }
+}
+
+async function handleJoinChat() {
+    const order_id = document.getElementById("verifyOrderId").value.trim();
+    const timestamp = document.getElementById("verifyTimestamp").value.trim();
+    const token = document.getElementById("verifyToken").value.trim();
+    if (!order_id || !timestamp || !token) return showAlert("warning", "请先登录并完成订单创建。");
+
+    setButtonLoading("joinChatBtn", "进入中...", true);
     try {
         const verifyRes = await fetch(`${BASE_URL}/verify_order`, {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ order_id, pid, timestamp, token })
+            credentials: "include",
+            body: JSON.stringify({ order_id, timestamp, token })
         });
-
         const verifyResult = await verifyRes.json();
-
         if (!verifyResult.success || !verifyResult.data.valid) {
             updateChatStatus("订单认证失败，无法进入聊天房间。", "danger");
-            showAlert("danger", "订单认证失败，无法进入聊天房间。");
-            return;
+            return showAlert("danger", "订单认证失败，无法进入聊天房间。");
         }
-
-        console.log("join_order payload:", {
-            order_id,
-            pid,
-            timestamp,
-            token,
-            role: "user"
-        });
-
-        socket.emit("join_order", {
-            order_id,
-            pid,
-            timestamp,
-            token,
-            role: "user"
-        });
+        socket.emit("join_order", { order_id, timestamp, token, role: "user" });
     } catch (error) {
-        console.error("handleJoinChat error:", error);
         showAlert("danger", "进入聊天房间失败，请检查后端是否启动。");
     } finally {
         setButtonLoading("joinChatBtn", "进入中...", false);
@@ -792,33 +612,13 @@ async function handleJoinChat() {
 }
 
 function handleSendMessage() {
-    if (!hasJoinedChatRoom) {
-        showAlert("warning", "请先进入聊天房间。");
-        return;
-    }
-
+    if (!hasJoinedChatRoom) return showAlert("warning", "请先进入聊天房间。");
     const order_id = document.getElementById("verifyOrderId").value.trim();
-    const sender_pid = document.getElementById("verifyPid").value.trim();
     const contentInput = document.getElementById("chatInput");
     const content = contentInput.value.trim();
-
-    if (!order_id || !sender_pid) {
-        showAlert("warning", "订单信息不完整。");
-        return;
-    }
-
-    if (!content) {
-        showAlert("warning", "请输入消息内容。");
-        return;
-    }
-
-    socket.emit("send_message", {
-        order_id,
-        sender_pid,
-        role: "user",
-        content
-    });
-
+    if (!order_id) return showAlert("warning", "订单信息不完整。");
+    if (!content) return showAlert("warning", "请输入消息内容。");
+    socket.emit("send_message", { order_id, role: "user", content });
     contentInput.value = "";
 }
 
@@ -827,24 +627,13 @@ async function reportMerkleRoot(orderId, merkleRoot, role) {
         await fetch(`${BASE_URL}/report_merkle_root`, {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ order_id: orderId, merkle_root: merkleRoot, role: role })
+            body: JSON.stringify({ order_id: orderId, merkle_root: merkleRoot, role })
         });
-    } catch (e) {
-        console.warn("Merkle root report failed:", e);
-    }
+    } catch (e) { console.warn("Merkle root report failed:", e); }
 }
 
-socket.on("connect", () => {
-    console.log("WebSocket connected");
-    updateChatStatus("WebSocket 已连接，可进入聊天房间。", "secondary");
-});
-
-socket.on("disconnect", () => {
-    hasJoinedChatRoom = false;
-    enableChatInput(false);
-    updateChatStatus("连接已断开。", "danger");
-});
-
+socket.on("connect", () => updateChatStatus("WebSocket 已连接，可进入聊天房间。", "secondary"));
+socket.on("disconnect", () => { hasJoinedChatRoom = false; enableChatInput(false); updateChatStatus("连接已断开。", "danger"); });
 socket.on("join_result", async (res) => {
     if (res.success) {
         hasJoinedChatRoom = true;
@@ -852,12 +641,8 @@ socket.on("join_result", async (res) => {
         enableChatInput(true);
         updateChatStatus(`已进入订单房间：${res.order_id}`, "success");
         showAlert("success", res.message || "进入聊天房间成功。");
-        // 恢复之前保存的 Merkle Root
         const savedRoot = localStorage.getItem("merkle_root_" + res.order_id);
-        if (savedRoot) {
-            currentMerkleRoot = savedRoot;
-            reportMerkleRoot(res.order_id, savedRoot, "user");
-        }
+        if (savedRoot) reportMerkleRoot(res.order_id, savedRoot, "user");
         await loadMessageHistory();
     } else {
         hasJoinedChatRoom = false;
@@ -866,39 +651,24 @@ socket.on("join_result", async (res) => {
         showAlert("danger", res.message || "进入聊天房间失败。");
     }
 });
-
-socket.on("system_message", (msg) => {
-    appendMessage({
-        type: "system",
-        message: msg.message,
-        timestamp: msg.timestamp
-    });
-});
-
-socket.on("receive_message", (msg) => {
+socket.on("system_message", msg => appendMessage({ type: "system", message: msg.message, timestamp: msg.timestamp }));
+socket.on("receive_message", msg => {
     appendMessage(msg);
-    // 保存 Merkle Root（服务端广播的最新 Root）
     if (msg.merkle_root) {
         currentMerkleRoot = msg.merkle_root;
         currentOrderId = msg.order_id || currentOrderId;
         localStorage.setItem("merkle_root_" + currentOrderId, currentMerkleRoot);
-        // 上报到服务器供三方比对
         reportMerkleRoot(currentOrderId, currentMerkleRoot, "user");
     }
 });
+socket.on("error_message", msg => showAlert("danger", msg.message || "聊天消息发送失败。"));
 
-socket.on("error_message", (msg) => {
-    showAlert("danger", msg.message || "聊天消息发送失败。");
-});
-
-window.onload = () => {
-    loadLocalData();
+window.addEventListener("DOMContentLoaded", async () => {
     enableChatInput(false);
-    // Initialize - try to refresh captcha if register form might be used
+    await checkSession();
     refreshCaptcha();
-};
+});
 </script>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

@@ -8,6 +8,7 @@ import uuid
 import json
 import os
 import hmac
+import hashlib
 import secrets
 
 from project.database.db import init_db, execute, query_one, query_all
@@ -22,6 +23,7 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = "foodshield-secret-key"
 app.config["ADMIN_USERNAME"] = os.getenv("FOODSHIELD_ADMIN_USERNAME", "admin")
 app.config["ADMIN_PASSWORD"] = os.getenv("FOODSHIELD_ADMIN_PASSWORD", "admin123456")
+app.config["ORDER_ALIAS_SECRET"] = os.getenv("FOODSHIELD_ORDER_ALIAS_SECRET", "foodshield-order-alias-secret")
 
 CORS(app)
 socketio = SocketIO(
@@ -37,6 +39,63 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 FRONTEND_DIR = BASE_DIR / "project" / "frontend"
 
 
+def ensure_schema_migrations():
+    """兼容旧版 foodshield.db：补齐导师建议后新增的字段。
+
+    注意：SQLite 的 CREATE TABLE IF NOT EXISTS 不会自动给已有表补字段。
+    因此旧数据库存在时，必须显式 ALTER TABLE。
+    """
+    try:
+        user_columns = {row["name"] for row in query_all("PRAGMA table_info(users)")}
+        if "password_hash" not in user_columns:
+            execute("ALTER TABLE users ADD COLUMN password_hash TEXT NOT NULL DEFAULT ''")
+        if "salt" not in user_columns:
+            execute("ALTER TABLE users ADD COLUMN salt TEXT NOT NULL DEFAULT ''")
+        if "device_fingerprint" not in user_columns:
+            execute("ALTER TABLE users ADD COLUMN device_fingerprint TEXT NOT NULL DEFAULT ''")
+
+        order_columns = {row["name"] for row in query_all("PRAGMA table_info(orders)")}
+        if "remark" not in order_columns:
+            execute("ALTER TABLE orders ADD COLUMN remark TEXT NOT NULL DEFAULT ''")
+        if "tag" not in order_columns:
+            execute("ALTER TABLE orders ADD COLUMN tag TEXT NOT NULL DEFAULT ''")
+        if "delivery_note" not in order_columns:
+            execute("ALTER TABLE orders ADD COLUMN delivery_note TEXT NOT NULL DEFAULT ''")
+    except Exception as exc:
+        print(f"[schema migration skipped] {exc}")
+
+
+def get_user_by_id(user_id: int):
+    return query_one("SELECT * FROM users WHERE id = ?", (user_id,))
+
+
+def user_required(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if not session.get("user_id"):
+            return jsonify({
+                "success": False,
+                "message": "请先登录后再操作"
+            }), 401
+        return func(*args, **kwargs)
+    return wrapper
+
+
+def get_current_user():
+    user_id = session.get("user_id")
+    if not user_id:
+        return None
+    return get_user_by_id(user_id)
+
+
+def public_message(msg: dict):
+    """普通用户/骑手视角不暴露 PID；管理员接口仍可看哈希和审计元数据。"""
+    item = dict(msg)
+    item.pop("sender_pid", None)
+    item["sender"] = item.get("role")
+    return item
+
+
 # ====================== 工具函数 ======================
 
 def now_iso():
@@ -45,6 +104,16 @@ def now_iso():
 
 def get_order_by_order_id(order_id: str):
     return query_one("SELECT * FROM orders WHERE order_id = ?", (order_id,))
+
+
+def make_order_alias(order_id: str) -> str:
+    """骑手端订单级匿名会话名：同一用户的多个订单也会呈现为不同 alias。"""
+    digest = hmac.new(
+        app.config["ORDER_ALIAS_SECRET"].encode("utf-8"),
+        f"{order_id}|rider_view".encode("utf-8"),
+        hashlib.sha256
+    ).hexdigest()
+    return f"Guest-{digest[:6].upper()}"
 
 
 def save_message(msg_id, order_id, sender_pid, role, content, message_hash, timestamp):
@@ -94,7 +163,7 @@ def get_message_history_for_admin(order_id: str):
     """
     rows = query_all(
         """
-        SELECT msg_id, order_id, sender_pid, role, message_hash, timestamp
+        SELECT msg_id, order_id, role, message_hash, timestamp
         FROM messages
         WHERE order_id = ?
         ORDER BY id ASC
@@ -105,6 +174,20 @@ def get_message_history_for_admin(order_id: str):
 
 
 def get_orders_by_user_id(user_id: int):
+    rows = query_all(
+        """
+        SELECT order_id, token, token_timestamp, remark, tag, delivery_note, status, created_at
+        FROM orders
+        WHERE user_id = ?
+        ORDER BY id DESC
+        """,
+        (user_id,)
+    )
+    return [dict(row) for row in rows]
+
+
+def get_trace_orders_by_user_id(user_id: int):
+    """管理员溯源结果中的订单列表：不返回 token、备注、标签、PID。"""
     rows = query_all(
         """
         SELECT order_id, status, created_at
@@ -164,12 +247,11 @@ def trace_pid(pid: str):
         return None
 
     user_dict = dict(user)
-    orders = get_orders_by_user_id(user_dict["id"])
+    orders = get_trace_orders_by_user_id(user_dict["id"])
 
     return {
         "user_id": user_dict["id"],
         "username": user_dict.get("username"),
-        "pid": user_dict.get("pid"),
         "created_at": user_dict.get("created_at"),
         "orders": orders
     }
@@ -211,17 +293,16 @@ def css_files(filename):
 
 @app.route("/register", methods=["POST"])
 def register():
-    """用户注册：用户名 + 密码 + 验证码 → 生成匿名 PID"""
-    data = request.json
-    if not data:
-        return jsonify({"success": False, "message": "请求体不能为空"}), 400
+    """用户注册：用户名 + 密码 + 设备指纹 + 验证码 → 后端生成匿名 PID（不直接展示）。"""
+    ensure_schema_migrations()
+    data = request.json or {}
 
     username = (data.get("username") or "").strip()
     password = (data.get("password") or "").strip()
     confirm_password = (data.get("confirm_password") or "").strip()
     captcha_answer = (data.get("captcha_answer") or "").strip()
+    machine_fp = (data.get("machine_fp") or data.get("device_fingerprint") or "").strip()
 
-    # 字段完整性校验
     if not username:
         return jsonify({"success": False, "message": "用户名不能为空"}), 400
     if not password:
@@ -232,8 +313,9 @@ def register():
         return jsonify({"success": False, "message": "两次密码输入不一致"}), 400
     if not captcha_answer:
         return jsonify({"success": False, "message": "验证码不能为空"}), 400
+    if not machine_fp:
+        return jsonify({"success": False, "message": "缺少设备识别信息，请刷新页面后重试"}), 400
 
-    # 验证码校验
     session_captcha = session.get("captcha_answer")
     if session_captcha is None:
         return jsonify({"success": False, "message": "验证码已过期，请刷新后重试"}), 400
@@ -242,37 +324,48 @@ def register():
             return jsonify({"success": False, "message": "验证码错误"}), 400
     except ValueError:
         return jsonify({"success": False, "message": "验证码格式错误"}), 400
-    # 验证码一次性使用
-    session.pop("captcha_answer", None)
+    finally:
+        session.pop("captcha_answer", None)
 
-    # 检查用户名重复
     existing = query_one("SELECT * FROM users WHERE username = ?", (username,))
     if existing:
-        return jsonify({"success": False, "message": "用户名已存在"}), 400
+        return jsonify({"success": False, "message": "用户名已存在"}), 409
+
+    # 简单设备级限流：同一设备最多注册 3 个账号，避免无成本机器注册。
+    fp_count = query_one(
+        "SELECT COUNT(*) AS cnt FROM users WHERE device_fingerprint = ?",
+        (machine_fp,)
+    )
+    if fp_count and fp_count["cnt"] >= 3:
+        return jsonify({
+            "success": False,
+            "message": "该设备注册次数过多，已触发机器注册限制"
+        }), 429
 
     try:
-        # 生成密码哈希: SM3(salt + password)
         salt = secrets.token_hex(16)
         password_hash = sm3_strhash(salt + password)
 
         temp_pid = f"temp_{uuid.uuid4()}"
         user_id = execute(
-            "INSERT INTO users (username, pid, password_hash, salt) VALUES (?, ?, ?, ?)",
-            (username, temp_pid, password_hash, salt)
+            """
+            INSERT INTO users (username, pid, password_hash, salt, device_fingerprint)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (username, temp_pid, password_hash, salt, machine_fp)
         )
 
         pid_result = generate_pid("FoodShield", str(user_id))
         pid = pid_result["pid"]
-
         execute("UPDATE users SET pid = ? WHERE id = ?", (pid, user_id))
 
-        # 注册即登录
+        # 注册即登录，但返回给前端时不展示 PID；PID 仅在后端参与 Token 校验和条件溯源。
         session["user_id"] = user_id
         session["username"] = username
 
         return jsonify({
             "success": True,
-            "message": "注册成功",
+            "message": "注册成功，请继续创建订单",
             "data": {
                 "user_id": user_id,
                 "username": username
@@ -312,16 +405,18 @@ def get_captcha():
 
 @app.route("/login", methods=["POST"])
 def login():
-    """用户登录：用户名 + 密码 → 验证 SM3(salt + password)"""
-    data = request.json
-    if not data:
-        return jsonify({"success": False, "message": "请求体不能为空"}), 400
+    """用户登录：用户名 + 密码 + 设备指纹 → 验证 SM3(salt + password)。"""
+    ensure_schema_migrations()
+    data = request.json or {}
 
     username = (data.get("username") or "").strip()
     password = (data.get("password") or "").strip()
+    machine_fp = (data.get("machine_fp") or data.get("device_fingerprint") or "").strip()
 
     if not username or not password:
         return jsonify({"success": False, "message": "用户名和密码不能为空"}), 400
+    if not machine_fp:
+        return jsonify({"success": False, "message": "缺少设备识别信息，请刷新页面后重试"}), 400
 
     user = query_one("SELECT * FROM users WHERE username = ?", (username,))
     if not user:
@@ -331,6 +426,17 @@ def login():
     if not hmac.compare_digest(computed_hash, user["password_hash"]):
         return jsonify({"success": False, "message": "用户名或密码错误"}), 401
 
+    saved_fp = user["device_fingerprint"] if "device_fingerprint" in user.keys() else ""
+    # 兼容旧账号：首次登录时绑定设备指纹；之后必须同设备登录。
+    if saved_fp:
+        if not hmac.compare_digest(saved_fp, machine_fp):
+            return jsonify({
+                "success": False,
+                "message": "设备识别失败，请使用注册设备登录"
+            }), 403
+    else:
+        execute("UPDATE users SET device_fingerprint = ? WHERE id = ?", (machine_fp, user["id"]))
+
     session["user_id"] = user["id"]
     session["username"] = user["username"]
 
@@ -339,27 +445,25 @@ def login():
         "message": "登录成功",
         "data": {
             "user_id": user["id"],
-            "username": user["username"],
-            "pid": user["pid"]
+            "username": user["username"]
         }
     })
 
 
 @app.route("/user/session", methods=["GET"])
 def get_user_session():
-    """检查当前用户登录状态"""
-    if session.get("user_id"):
-        user = query_one("SELECT id, username, pid FROM users WHERE id = ?", (session["user_id"],))
-        if user:
-            return jsonify({
-                "success": True,
-                "data": {
-                    "logged_in": True,
-                    "user_id": user["id"],
-                    "username": user["username"],
-                    "pid": user["pid"]
-                }
-            })
+    """检查当前用户登录状态；不向前端返回 PID。"""
+    ensure_schema_migrations()
+    user = get_current_user()
+    if user:
+        return jsonify({
+            "success": True,
+            "data": {
+                "logged_in": True,
+                "user_id": user["id"],
+                "username": user["username"]
+            }
+        })
     return jsonify({
         "success": True,
         "data": {
@@ -376,20 +480,74 @@ def logout():
     return jsonify({"success": True, "message": "已登出"})
 
 
+@app.route("/my_orders", methods=["GET"])
+@user_required
+def my_orders():
+    """仅返回当前登录用户自己的订单历史，不暴露 PID。"""
+    ensure_schema_migrations()
+    user_id = session["user_id"]
+    orders = get_orders_by_user_id(user_id)
+    return jsonify({
+        "success": True,
+        "message": "orders fetched successfully",
+        "data": orders
+    }), 200
+
+
+@app.route("/my_orders/search", methods=["GET"])
+@user_required
+def search_my_orders():
+    """用户端订单搜索：只查当前登录用户自己的订单，可按订单号/备注/标签搜索。"""
+    ensure_schema_migrations()
+    user_id = session["user_id"]
+    keyword = (request.args.get("keyword") or "").strip()
+    status = (request.args.get("status") or "").strip()
+
+    sql = """
+        SELECT order_id, token, token_timestamp, remark, tag, delivery_note, status, created_at
+        FROM orders
+        WHERE user_id = ?
+    """
+    params = [user_id]
+
+    if keyword:
+        like = f"%{keyword}%"
+        sql += " AND (order_id LIKE ? OR remark LIKE ? OR tag LIKE ?)"
+        params.extend([like, like, like])
+
+    if status:
+        sql += " AND status = ?"
+        params.append(status)
+
+    sql += " ORDER BY id DESC"
+
+    rows = query_all(sql, tuple(params))
+    return jsonify({
+        "success": True,
+        "message": "user order search completed",
+        "data": [dict(row) for row in rows]
+    }), 200
+
+
 @app.route("/create_order", methods=["POST"])
+@user_required
 def create_order():
-    data = request.json
-    if not data or "pid" not in data:
-        return jsonify({"success": False, "message": "pid is required"}), 400
-
-    pid = data["pid"]
-
-    user = query_one("SELECT * FROM users WHERE pid = ?", (pid,))
+    """
+    创建订单必须基于服务端 session。
+    关键修复：不再接受/信任前端提交的 PID，避免未登录或伪造 PID 无限创建订单。
+    """
+    ensure_schema_migrations()
+    data = request.json or {}
+    user = get_current_user()
     if not user:
-        return jsonify({"success": False, "message": "user not found"}), 404
+        return jsonify({"success": False, "message": "请先登录后再创建订单"}), 401
 
     user_id = user["id"]
+    pid = user["pid"]
     order_id = str(uuid.uuid4())
+    remark = str(data.get("remark") or "").strip()[:200]
+    tag = str(data.get("tag") or "").strip()[:50]
+    delivery_note = str(data.get("delivery_note") or "").strip()[:200]
 
     token_data = generate_token(order_id, pid)
     token = token_data["token"]
@@ -398,10 +556,10 @@ def create_order():
     try:
         execute(
             """
-            INSERT INTO orders (order_id, user_id, token, token_timestamp, status)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO orders (order_id, user_id, token, token_timestamp, remark, tag, delivery_note, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (order_id, user_id, token, timestamp, "created")
+            (order_id, user_id, token, timestamp, remark, tag, delivery_note, "created")
         )
 
         return jsonify({
@@ -409,9 +567,11 @@ def create_order():
             "message": "order created successfully",
             "data": {
                 "order_id": order_id,
-                "pid": pid,
                 "token": token,
                 "timestamp": timestamp,
+                "remark": remark,
+                "tag": tag,
+                "delivery_note": delivery_note,
                 "status": "created"
             }
         }), 201
@@ -422,19 +582,34 @@ def create_order():
 
 @app.route("/verify_order", methods=["POST"])
 def verify_order_api():
-    data = request.json
-    required = ["order_id", "pid", "timestamp", "token"]
-
+    """验证订单 Token。优先使用当前登录用户的 PID；PID 不需要前端提交。"""
+    data = request.json or {}
+    required = ["order_id", "timestamp", "token"]
     for field in required:
-        if not data or field not in data:
+        if field not in data:
             return jsonify({"success": False, "message": f"{field} is required"}), 400
 
-    is_valid = verify_token(
-        data["order_id"],
-        data["pid"],
-        data["timestamp"],
-        data["token"]
-    )
+    order = get_order_by_order_id(data["order_id"])
+    if not order:
+        return jsonify({"success": False, "message": "order not found"}), 404
+
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({"success": False, "message": "请先登录后再验证订单"}), 401
+    if int(current_user["id"]) != int(order["user_id"]):
+        return jsonify({"success": False, "message": "只能验证当前登录用户自己的订单"}), 403
+
+    pid = current_user["pid"]
+
+    try:
+        is_valid = verify_token(
+            data["order_id"],
+            pid,
+            data["timestamp"],
+            data["token"]
+        )
+    except Exception:
+        is_valid = False
 
     return jsonify({
         "success": True,
@@ -447,12 +622,13 @@ def verify_order_api():
 
 @app.route("/get_pending_orders", methods=["GET"])
 def get_pending_orders():
+    """骑手端查看待接订单：只展示订单号和状态，不暴露用户 PID。"""
     try:
+        ensure_schema_migrations()
         rows = query_all(
             """
-            SELECT o.order_id, o.status, u.pid
+            SELECT o.order_id, o.status, o.delivery_note, o.created_at
             FROM orders o
-            JOIN users u ON o.user_id = u.id
             WHERE o.status = 'created'
             ORDER BY o.id DESC
             """
@@ -462,8 +638,10 @@ def get_pending_orders():
         for row in rows:
             orders.append({
                 "order_id": row["order_id"],
+                "order_alias": make_order_alias(row["order_id"]),
                 "status": row["status"],
-                "pid": row["pid"]
+                "delivery_note": row["delivery_note"],
+                "created_at": row["created_at"]
             })
 
         return jsonify({
@@ -474,6 +652,53 @@ def get_pending_orders():
 
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/rider/orders/search", methods=["GET"])
+def rider_search_orders():
+    """骑手端订单搜索：不返回 PID、user_id、username、token、用户备注/标签。
+
+    仅按订单号、订单状态、配送必要说明检索，并返回订单级匿名 alias，
+    避免骑手把同一用户的多个订单关联起来。
+    """
+    ensure_schema_migrations()
+    keyword = (request.args.get("keyword") or "").strip()
+    status = (request.args.get("status") or "created").strip()
+
+    sql = """
+        SELECT order_id, status, delivery_note, created_at
+        FROM orders
+        WHERE 1 = 1
+    """
+    params = []
+
+    if status:
+        sql += " AND status = ?"
+        params.append(status)
+
+    if keyword:
+        like = f"%{keyword}%"
+        sql += " AND (order_id LIKE ? OR delivery_note LIKE ?)"
+        params.extend([like, like])
+
+    sql += " ORDER BY id DESC"
+
+    rows = query_all(sql, tuple(params))
+    result = []
+    for row in rows:
+        result.append({
+            "order_id": row["order_id"],
+            "order_alias": make_order_alias(row["order_id"]),
+            "status": row["status"],
+            "delivery_note": row["delivery_note"],
+            "created_at": row["created_at"]
+        })
+
+    return jsonify({
+        "success": True,
+        "message": "rider order search completed",
+        "data": result
+    }), 200
 
 
 @app.route("/take_order", methods=["POST"])
@@ -520,7 +745,7 @@ def get_message_history(order_id):
         if not order:
             return jsonify({"success": False, "message": "order not found"}), 404
 
-        history = get_message_history_by_order(order_id)
+        history = [public_message(msg) for msg in get_message_history_by_order(order_id)]
         return jsonify({
             "success": True,
             "message": "message history fetched successfully",
@@ -777,6 +1002,82 @@ def admin_verify_order(order_id):
         }), 500
 
 
+@app.route("/admin/orders/search", methods=["GET"])
+@admin_required
+def admin_search_orders():
+    """管理员端审计搜索：只返回审计元数据和消息哈希，不返回备注/标签/PID/Token/明文。"""
+    ensure_schema_migrations()
+    order_id = (request.args.get("order_id") or "").strip()
+    message_hash = (request.args.get("hash") or "").strip()
+    action = (request.args.get("action") or "").strip()
+
+    sql = """
+        SELECT
+            o.order_id,
+            o.status,
+            o.created_at,
+            COUNT(DISTINCT m.id) AS message_count,
+            MAX(a.action) AS latest_action,
+            MAX(a.created_at) AS latest_audit_time,
+            (
+                SELECT al.merkle_root
+                FROM audit_logs al
+                WHERE al.order_id = o.order_id AND al.merkle_root IS NOT NULL
+                ORDER BY al.id DESC
+                LIMIT 1
+            ) AS latest_merkle_root
+        FROM orders o
+        LEFT JOIN messages m ON o.order_id = m.order_id
+        LEFT JOIN audit_logs a ON o.order_id = a.order_id
+        WHERE 1 = 1
+    """
+    params = []
+
+    if order_id:
+        sql += " AND o.order_id LIKE ?"
+        params.append(f"%{order_id}%")
+
+    if message_hash:
+        sql += " AND EXISTS (SELECT 1 FROM messages mh WHERE mh.order_id = o.order_id AND mh.message_hash LIKE ?)"
+        params.append(f"%{message_hash}%")
+
+    if action:
+        sql += " AND EXISTS (SELECT 1 FROM audit_logs ah WHERE ah.order_id = o.order_id AND ah.action = ?)"
+        params.append(action)
+
+    sql += " GROUP BY o.order_id, o.status, o.created_at ORDER BY o.id DESC LIMIT 100"
+
+    rows = query_all(sql, tuple(params))
+    result = []
+    for row in rows:
+        hashes = query_all(
+            """
+            SELECT message_hash, role, timestamp
+            FROM messages
+            WHERE order_id = ?
+            ORDER BY id ASC
+            LIMIT 20
+            """,
+            (row["order_id"],)
+        )
+        result.append({
+            "order_id": row["order_id"],
+            "status": row["status"],
+            "created_at": row["created_at"],
+            "message_count": row["message_count"],
+            "latest_action": row["latest_action"],
+            "latest_audit_time": row["latest_audit_time"],
+            "latest_merkle_root": row["latest_merkle_root"],
+            "message_hashes": [dict(h) for h in hashes]
+        })
+
+    return jsonify({
+        "success": True,
+        "message": "admin audit search completed",
+        "data": result
+    }), 200
+
+
 @app.route("/admin/orders", methods=["GET"])
 @admin_required
 def admin_get_orders():
@@ -830,47 +1131,65 @@ def admin_get_orders():
 @app.route("/admin/trace", methods=["POST"])
 @admin_required
 def admin_trace():
+    """管理员条件溯源：按订单号触发，不要求管理员手动输入 PID。"""
     try:
         data = request.json or {}
-        pid = str(data.get("pid", "")).strip()
+        order_id = str(data.get("order_id", "")).strip()
         reason = str(data.get("reason", "")).strip() or "unspecified"
 
-        if not pid:
+        if not order_id:
             return jsonify({
                 "success": False,
-                "message": "pid is required"
+                "message": "order_id is required"
             }), 400
 
-        result = trace_pid(pid)
+        order = get_order_by_order_id(order_id)
         admin_username = session.get("admin_username", "unknown")
-
-        if not result:
+        if not order:
             log_admin_action(
                 action="TRACE_FAIL",
                 detail={
-                    "pid": pid,
+                    "order_id": order_id,
                     "reason": reason,
-                    "admin_username": admin_username
+                    "admin_username": admin_username,
+                    "reason_code": "order_not_found"
                 },
-                order_id=None
+                order_id=order_id
             )
             return jsonify({
                 "success": False,
-                "message": "pid not found"
+                "message": "order not found"
             }), 404
 
-        latest_order_id = result["orders"][0]["order_id"] if result["orders"] else None
+        user = get_user_by_id(order["user_id"])
+        if not user:
+            log_admin_action(
+                action="TRACE_FAIL",
+                detail={
+                    "order_id": order_id,
+                    "reason": reason,
+                    "admin_username": admin_username,
+                    "reason_code": "user_not_found"
+                },
+                order_id=order_id
+            )
+            return jsonify({
+                "success": False,
+                "message": "user not found"
+            }), 404
+
+        result = trace_pid(user["pid"])
 
         log_admin_action(
             action="TRACE_SUCCESS",
             detail={
-                "pid": pid,
+                "order_id": order_id,
                 "reason": reason,
                 "admin_username": admin_username,
                 "user_id": result["user_id"],
                 "username": result["username"]
             },
-            order_id=latest_order_id
+            order_id=order_id
         )
 
         return jsonify({
@@ -922,22 +1241,12 @@ def handle_connect():
 @socketio.on("join_order")
 def handle_join_order(data):
     """
-    用户侧进入订单聊天房间
-    data = {
-        "order_id": "...",
-        "pid": "...",
-        "timestamp": "...",
-        "token": "...",
-        "role": "user"
-    }
+    用户侧进入订单聊天房间。
+    隐私修复：前端不再提交 PID，后端根据 session 与订单归属关系取 PID 校验 Token。
     """
-    print("=== join_order received ===")
-    print("raw data:", data)
-
-    required = ["order_id", "pid", "timestamp", "token", "role"]
+    required = ["order_id", "timestamp", "token", "role"]
     for field in required:
         if not data or field not in data:
-            print(f"join_order failed: missing field -> {field}")
             emit("join_result", {
                 "success": False,
                 "message": f"{field} is required"
@@ -945,33 +1254,40 @@ def handle_join_order(data):
             return
 
     order_id = data["order_id"]
-    pid = data["pid"]
     timestamp = data["timestamp"]
     token = data["token"]
     role = data["role"]
 
-    print("order_id =", order_id)
-    print("pid =", pid)
-    print("timestamp =", timestamp)
-    print("role =", role)
-    print("token prefix =", token[:16] + "..." if token else "")
+    if role != "user":
+        emit("join_result", {"success": False, "message": "invalid role for user join"})
+        return
 
     order = get_order_by_order_id(order_id)
-    print("order found =", bool(order))
-
     if not order:
-        print("join_order failed: order not found")
+        emit("join_result", {"success": False, "message": "order not found"})
+        return
+
+    session_user_id = session.get("user_id")
+    if not session_user_id or int(session_user_id) != int(order["user_id"]):
         emit("join_result", {
             "success": False,
-            "message": "order not found"
+            "message": "please login as the order owner first"
         })
         return
 
-    is_valid = verify_token(order_id, pid, timestamp, token)
-    print("verify_token result =", is_valid)
+    owner = get_user_by_id(order["user_id"])
+    if not owner:
+        emit("join_result", {"success": False, "message": "order owner not found"})
+        return
+
+    pid = owner["pid"]
+
+    try:
+        is_valid = verify_token(order_id, pid, timestamp, token)
+    except Exception:
+        is_valid = False
 
     if not is_valid:
-        print("join_order failed: order verification failed")
         emit("join_result", {
             "success": False,
             "message": "order verification failed"
@@ -979,7 +1295,6 @@ def handle_join_order(data):
         return
 
     join_room(order_id)
-    print("join_order success: joined room", order_id)
 
     emit("join_result", {
         "success": True,
@@ -1050,14 +1365,10 @@ def handle_join_order_as_rider(data):
 @socketio.on("send_message")
 def handle_send_message(data):
     """
-    data = {
-        "order_id": "...",
-        "sender_pid": "...",
-        "role": "user" / "rider",
-        "content": "..."
-    }
+    发送消息。
+    修复：用户消息的 sender_pid 由订单归属用户确定，不能完全相信前端提交值；广播给普通端时不暴露 PID。
     """
-    required = ["order_id", "sender_pid", "role", "content"]
+    required = ["order_id", "role", "content"]
     for field in required:
         if not data or field not in data:
             emit("error_message", {
@@ -1067,9 +1378,12 @@ def handle_send_message(data):
             return
 
     order_id = data["order_id"]
-    sender_pid = data["sender_pid"]
     role = data["role"]
     content = str(data["content"]).strip()
+
+    if role not in ("user", "rider"):
+        emit("error_message", {"type": "error", "message": "invalid role"})
+        return
 
     if not content:
         emit("error_message", {
@@ -1080,11 +1394,21 @@ def handle_send_message(data):
 
     order = get_order_by_order_id(order_id)
     if not order:
-        emit("error_message", {
-            "type": "error",
-            "message": "order not found"
-        })
+        emit("error_message", {"type": "error", "message": "order not found"})
         return
+
+    owner = get_user_by_id(order["user_id"])
+    if role == "user":
+        if not owner:
+            emit("error_message", {"type": "error", "message": "order owner not found"})
+            return
+        session_user_id = session.get("user_id")
+        if not session_user_id or int(session_user_id) != int(order["user_id"]):
+            emit("error_message", {"type": "error", "message": "please login as the order owner first"})
+            return
+        sender_pid = owner["pid"]
+    else:
+        sender_pid = "RIDER_DEMO_001"
 
     timestamp = now_iso()
     msg_id = str(uuid.uuid4())
@@ -1122,7 +1446,7 @@ def handle_send_message(data):
         snapshot = create_merkle_snapshot(order_id)
         msg["merkle_root"] = snapshot["merkle_root"]
 
-        emit("receive_message", msg, room=order_id)
+        emit("receive_message", public_message(msg), room=order_id)
 
     except Exception as e:
         print(f"[send_message] error: {e}")
@@ -1130,6 +1454,7 @@ def handle_send_message(data):
             "type": "error",
             "message": str(e)
         })
+
 
 @app.route("/admin/backfill_snapshots", methods=["POST"])
 @admin_required
@@ -1191,76 +1516,41 @@ def admin_backfill_snapshots():
 
 
 # ====================== 条件溯源 API 补充 ======================
-@app.route("/admin/trace", methods=["POST"])
+@app.route("/admin/trace_violation", methods=["POST"])
+@admin_required
 def admin_trace_violation():
-    data = request.json
-    order_id = data.get("order_id")
-    keyword = data.get("keyword", "").strip()
+    """旧版按关键词扫描明文的溯源接口已禁用。
 
-    if not order_id or not keyword:
-        return jsonify({"success": False, "message": "order_id and keyword are required"}), 400
+    新版隐私边界：管理员端不读取、不存储、不检索聊天明文；
+    管理员只能基于订单号、投诉原因和哈希化审计日志触发条件溯源。
+    """
+    data = request.json or {}
+    order_id = str(data.get("order_id", "")).strip()
+    reason = str(data.get("reason", "关键词扫描接口已禁用")).strip()
 
-    try:
-        # 1. 强制进行完整性校验
-        integrity = verify_order_integrity(order_id)
-        if not integrity.get("is_valid"):
-            return jsonify({
-                "success": True,
-                "data": {
-                    "safe_to_trace": False,
-                    "message": "底层日志校验失败，证据链已被污染，系统阻断溯源操作！"
-                }
-            })
+    if not order_id:
+        return jsonify({"success": False, "message": "order_id is required"}), 400
 
-        # 2. 检查关键字是否命中
-        messages = get_message_history_by_order(order_id)
-        malicious_pids = set()
-        for msg in messages:
-            # 只要内容包含关键字且存在发送者，就记录 PID
-            if keyword in msg.get("content", "") and msg.get("sender_pid"):
-                malicious_pids.add(msg.get("sender_pid"))
+    log_admin_action(
+        action="TRACE_KEYWORD_SCAN_BLOCKED",
+        detail={
+            "order_id": order_id,
+            "reason": reason,
+            "policy": "admin_hash_only_no_plaintext_scan",
+            "admin_username": session.get("admin_username", "unknown")
+        },
+        order_id=order_id
+    )
 
-        if not malicious_pids:
-            return jsonify({
-                "success": True,
-                "data": {
-                    "safe_to_trace": False,
-                    "message": f"未命中：聊天记录中不存在违规词汇 '{keyword}'。"
-                }
-            })
-
-        # 3. 命中！解密真实身份
-        traced_users = []
-        for pid in malicious_pids:
-            # 健壮性改进：尝试关联 users 表
-            user = query_one("SELECT username FROM users WHERE pid = ?", (pid,))
-            if user:
-                traced_users.append({
-                    "pid": pid,
-                    "username": user["username"]
-                })
-            else:
-                # 兜底处理：如果没注册真名，至少把 PID 显示出来
-                traced_users.append({
-                    "pid": pid,
-                    "username": "未在库注册身份 (测试数据)"
-                })
-
-        return jsonify({
-            "success": True,
-            "data": {
-                "safe_to_trace": True,
-                "message": "检测命中！已锁定涉嫌违规 PID，准许溯源。",
-                "traced_users": traced_users
-            }
-        })
-
-    except Exception as e:
-        print(f"溯源出错: {e}")
-        return jsonify({"success": False, "message": str(e)}), 500
+    return jsonify({
+        "success": False,
+        "message": "管理员端不读取聊天明文，关键词扫描溯源已禁用；请使用 /admin/trace 按订单号和溯源原因触发条件溯源。"
+    }), 403
     
+
 # ====================== 启动 ======================
 
 if __name__ == "__main__":
     init_db()
+    ensure_schema_migrations()
     socketio.run(app, host="127.0.0.1", port=5000, debug=True, allow_unsafe_werkzeug=True)

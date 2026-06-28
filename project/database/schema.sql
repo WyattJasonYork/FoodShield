@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS users (
     pid_r TEXT,
     password_hash TEXT NOT NULL DEFAULT '',
     salt TEXT NOT NULL DEFAULT '',
+    device_fingerprint TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -14,6 +15,9 @@ CREATE TABLE IF NOT EXISTS orders (
     user_id INTEGER NOT NULL,
     token TEXT,
     token_timestamp TEXT,
+    remark TEXT NOT NULL DEFAULT '',
+    tag TEXT NOT NULL DEFAULT '',
+    delivery_note TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT 'created'
         CHECK (status IN ('created', 'taken', 'delivering', 'completed', 'cancelled')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
