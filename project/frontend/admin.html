@@ -183,7 +183,7 @@
                         </tr>
                     </thead>
                     <tbody id="logBody">
-                        <tr><td colspan="5" class="text-center text-muted">请输入订单号或从左侧选择订单...</td></tr>
+                        <tr><td colspan="4" class="text-center text-muted">请输入订单号或从左侧选择订单...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -443,14 +443,14 @@
         }
 
         const tbody = document.getElementById("logBody");
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">加载中...</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">加载中...</td></tr>`;
 
         try {
             const json = await apiRequest(`/admin/messages/${encodeURIComponent(orderId)}`);
             const logs = json.data || [];
 
             if (logs.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">该订单暂无通信记录</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">该订单暂无通信记录</td></tr>`;
             } else {
                 tbody.innerHTML = logs.map(log => {
                     const fullHash = log.message_hash || "";
@@ -479,7 +479,7 @@
             await fetchAuditLogs(orderId);
             showAlert("success", `成功加载订单 ${escapeHtml(orderId)} 的通信记录与审计日志。`);
         } catch (e) {
-            tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">加载失败：${escapeHtml(e.message)}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">加载失败：${escapeHtml(e.message)}</td></tr>`;
             showAlert("danger", `获取通信记录失败：${escapeHtml(e.message)}`);
         }
     }
