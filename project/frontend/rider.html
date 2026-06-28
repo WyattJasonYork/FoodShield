@@ -197,6 +197,8 @@ const socket = io(window.location.origin, {
 });
 
 let hasJoinedChatRoom = false;
+let currentMerkleRoot = null;
+let currentOrderId = "";
 
 function showAlert(type, message) {
     const alertBox = document.getElementById("alertBox");
@@ -452,6 +454,18 @@ function handleSendMessage() {
     contentInput.value = "";
 }
 
+async function reportMerkleRoot(orderId, merkleRoot, role) {
+    try {
+        await fetch(`${BASE_URL}/report_merkle_root`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ order_id: orderId, merkle_root: merkleRoot, role: role })
+        });
+    } catch (e) {
+        console.warn("Merkle root report failed:", e);
+    }
+}
+
 socket.on("connect", () => {
     console.log("Socket connected, id =", socket.id);
     updateChatStatus("Socket 已连接，可接单后入房。", "secondary");
@@ -472,9 +486,15 @@ socket.on("disconnect", (reason) => {
 socket.on("join_result", async (res) => {
     if (res.success) {
         hasJoinedChatRoom = true;
+        currentOrderId = res.order_id;
         enableChatInput(true);
         updateChatStatus(`已进入订单房间：${res.order_id}`, "success");
         showAlert("success", res.message || "进入聊天房间成功。");
+        const savedRoot = localStorage.getItem("merkle_root_" + res.order_id);
+        if (savedRoot) {
+            currentMerkleRoot = savedRoot;
+            reportMerkleRoot(res.order_id, savedRoot, "rider");
+        }
         await loadMessageHistory();
     } else {
         hasJoinedChatRoom = false;
@@ -494,6 +514,12 @@ socket.on("system_message", (msg) => {
 
 socket.on("receive_message", (msg) => {
     appendMessage(msg);
+    if (msg.merkle_root) {
+        currentMerkleRoot = msg.merkle_root;
+        currentOrderId = msg.order_id || currentOrderId;
+        localStorage.setItem("merkle_root_" + currentOrderId, currentMerkleRoot);
+        reportMerkleRoot(currentOrderId, currentMerkleRoot, "rider");
+    }
 });
 
 socket.on("error_message", (msg) => {

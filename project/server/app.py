@@ -87,6 +87,23 @@ def get_user_by_pid(pid: str):
     return query_one("SELECT * FROM users WHERE pid = ?", (pid,))
 
 
+def get_message_history_for_admin(order_id: str):
+    """
+    管理员视角的消息列表：不含明文内容，只有 SM3 哈希 + 元数据。
+    Merkle 完整性验证只需哈希，管理员不需要读明文。
+    """
+    rows = query_all(
+        """
+        SELECT msg_id, order_id, sender_pid, role, message_hash, timestamp
+        FROM messages
+        WHERE order_id = ?
+        ORDER BY id ASC
+        """,
+        (order_id,)
+    )
+    return [dict(row) for row in rows]
+
+
 def get_orders_by_user_id(user_id: int):
     rows = query_all(
         """
@@ -651,10 +668,10 @@ def admin_get_messages(order_id):
                 "message": "order not found"
             }), 404
 
-        history = get_message_history_by_order(order_id)
+        history = get_message_history_for_admin(order_id)
         return jsonify({
             "success": True,
-            "message": "admin fetched messages successfully",
+            "message": "admin fetched messages (hash only, no plaintext)",
             "data": history
         }), 200
 
@@ -721,8 +738,34 @@ def admin_verify_order(order_id):
 
         result = verify_order_integrity(order_id)
 
+        # 三方 Merkle Root 比对：查询客户端上报的最新 Root
+        client_roots = {}
+        for role_filter in ("user", "rider"):
+            client_log = query_one(
+                """
+                SELECT merkle_root FROM audit_logs
+                WHERE order_id = ? AND action = 'CLIENT_ROOT_REPORTED'
+                  AND json_extract(detail, '$.role') = ?
+                ORDER BY id DESC LIMIT 1
+                """,
+                (order_id, role_filter)
+            )
+            if client_log:
+                client_roots[role_filter] = client_log["merkle_root"]
+
+        server_root = result.get("current_root")
+        all_match = False
+        if server_root and len(client_roots) >= 2:
+            all_match = (
+                server_root == client_roots.get("user")
+                and server_root == client_roots.get("rider")
+            )
+
+        result["client_roots"] = client_roots if client_roots else None
+        result["all_match"] = all_match
+
         return jsonify({
-            "success": result["success"],
+            "success": result["success"] and all_match,
             "message": "integrity verification completed" if result["success"] else "integrity verification failed",
             "data": result
         }), 200
@@ -842,6 +885,31 @@ def admin_trace():
             "message": str(e)
         }), 500
 
+
+
+# ====================== 客户端 Merkle Root 上报 ======================
+
+@app.route("/report_merkle_root", methods=["POST"])
+def report_merkle_root():
+    """用户端/骑手端上报本地保存的 Merkle Root，存入 audit_logs 供管理员三方比对"""
+    data = request.json
+    if not data:
+        return jsonify({"success": False, "message": "请求体不能为空"}), 400
+    order_id = (data.get("order_id") or "").strip()
+    merkle_root = (data.get("merkle_root") or "").strip()
+    role = (data.get("role") or "").strip()
+    if not order_id or not merkle_root or not role:
+        return jsonify({"success": False, "message": "order_id, merkle_root, role 均为必填"}), 400
+    if role not in ("user", "rider"):
+        return jsonify({"success": False, "message": "role 必须为 user 或 rider"}), 400
+    try:
+        execute(
+            "INSERT INTO audit_logs (order_id, action, detail, merkle_root) VALUES (?, ?, ?, ?)",
+            (order_id, "CLIENT_ROOT_REPORTED", json.dumps({"role": role}, ensure_ascii=False), merkle_root)
+        )
+        return jsonify({"success": True, "message": "merkle root reported"}), 200
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
 
 
 # ====================== WebSocket 事件 ======================
@@ -1052,6 +1120,7 @@ def handle_send_message(data):
         )
 
         snapshot = create_merkle_snapshot(order_id)
+        msg["merkle_root"] = snapshot["merkle_root"]
 
         emit("receive_message", msg, room=order_id)
 
