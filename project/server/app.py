@@ -14,7 +14,7 @@ import secrets
 from project.database.db import init_db, execute, query_one, query_all
 from project.crypto.pid import generate_pid
 from project.crypto.token_utils import generate_token, verify_token
-from project.crypto.merkle import hash_message
+from project.crypto.merkle import hash_message, build_merkle_root
 from project.crypto.sm_utils import sm4_encrypt, sm4_decrypt, sm3_strhash
 from project.server.logger import create_merkle_snapshot, verify_order_integrity
 
@@ -129,6 +129,116 @@ def make_order_alias(order_id: str) -> str:
         hashlib.sha256
     ).hexdigest()
     return f"Guest-{digest[:6].upper()}"
+
+
+def calculate_current_order_root(order_id: str) -> dict:
+    """根据当前订单消息哈希序列计算管理员端当前 Merkle Root。
+
+    这里不读取聊天明文，只使用 messages.message_hash 作为叶子节点，
+    供“用户端 Root / 骑手端 Root / 管理员端 Root”三方一致性验证。
+    """
+    rows = query_all(
+        """
+        SELECT message_hash
+        FROM messages
+        WHERE order_id = ?
+        ORDER BY timestamp ASC, id ASC
+        """,
+        (order_id,)
+    )
+    leaf_hashes = [row["message_hash"] for row in rows if row["message_hash"]]
+    return {
+        "message_count": len(leaf_hashes),
+        "merkle_root": build_merkle_root(leaf_hashes),
+        "leaf_hashes": leaf_hashes
+    }
+
+
+def get_latest_admin_snapshot_root(order_id: str):
+    row = query_one(
+        """
+        SELECT merkle_root, created_at
+        FROM audit_logs
+        WHERE order_id = ? AND action = 'MERKLE_ROOT_UPDATED' AND merkle_root IS NOT NULL
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        (order_id,)
+    )
+    return dict(row) if row else None
+
+
+def get_latest_client_root(order_id: str, role: str):
+    """获取用户端或骑手端最近一次上报的 Merkle Root。
+
+    不依赖 SQLite JSON1 扩展，直接解析 audit_logs.detail 中的 JSON。
+    """
+    rows = query_all(
+        """
+        SELECT merkle_root, detail, created_at
+        FROM audit_logs
+        WHERE order_id = ? AND action = 'CLIENT_ROOT_REPORTED' AND merkle_root IS NOT NULL
+        ORDER BY id DESC
+        LIMIT 100
+        """,
+        (order_id,)
+    )
+    for row in rows:
+        try:
+            detail = json.loads(row["detail"] or "{}")
+        except Exception:
+            detail = {}
+        if detail.get("role") == role:
+            return {
+                "role": role,
+                "merkle_root": row["merkle_root"],
+                "created_at": row["created_at"]
+            }
+    return None
+
+
+def build_three_party_consistency(order_id: str) -> dict:
+    """构造三端 Merkle Root 一致性验证结果。
+
+    三端含义：
+    - admin/server：管理员端基于数据库消息哈希序列计算出的当前 Root；
+    - user：用户端上报的本端 Root；
+    - rider：骑手端上报的本端 Root。
+
+    只有三者同时存在且完全相等，才认为同一订单三方消息视图一致。
+    """
+    current = calculate_current_order_root(order_id)
+    admin_root = current["merkle_root"]
+    user_report = get_latest_client_root(order_id, "user")
+    rider_report = get_latest_client_root(order_id, "rider")
+    snapshot = get_latest_admin_snapshot_root(order_id)
+
+    user_root = user_report["merkle_root"] if user_report else None
+    rider_root = rider_report["merkle_root"] if rider_report else None
+    all_present = bool(admin_root and user_root and rider_root)
+    all_match = bool(all_present and admin_root == user_root == rider_root)
+
+    missing_roles = []
+    if not user_root:
+        missing_roles.append("user")
+    if not rider_root:
+        missing_roles.append("rider")
+
+    return {
+        "order_id": order_id,
+        "message_count": current["message_count"],
+        "admin_root": admin_root,
+        "user_root": user_root,
+        "rider_root": rider_root,
+        "latest_snapshot_root": snapshot["merkle_root"] if snapshot else None,
+        "latest_snapshot_time": snapshot["created_at"] if snapshot else None,
+        "user_report_time": user_report["created_at"] if user_report else None,
+        "rider_report_time": rider_report["created_at"] if rider_report else None,
+        "all_present": all_present,
+        "all_match": all_match,
+        "missing_roles": missing_roles,
+        "policy": "three_party_root_consistency_no_plaintext"
+    }
 
 
 def save_message(msg_id, order_id, sender_pid, role, content, message_hash, timestamp):
@@ -1217,34 +1327,17 @@ def admin_verify_order(order_id):
 
         result = verify_order_integrity(order_id)
 
-        # 三方 Merkle Root 比对：查询客户端上报的最新 Root
-        client_roots = {}
-        for role_filter in ("user", "rider"):
-            client_log = query_one(
-                """
-                SELECT merkle_root FROM audit_logs
-                WHERE order_id = ? AND action = 'CLIENT_ROOT_REPORTED'
-                  AND json_extract(detail, '$.role') = ?
-                ORDER BY id DESC LIMIT 1
-                """,
-                (order_id, role_filter)
-            )
-            if client_log:
-                client_roots[role_filter] = client_log["merkle_root"]
-
-        server_root = result.get("current_root")
-        all_match = False
-        if server_root and len(client_roots) >= 2:
-            all_match = (
-                server_root == client_roots.get("user")
-                and server_root == client_roots.get("rider")
-            )
-
-        result["client_roots"] = client_roots if client_roots else None
-        result["all_match"] = all_match
+        # 三端 Merkle Root 比对：管理员端当前 Root + 用户端上报 Root + 骑手端上报 Root。
+        three_party = build_three_party_consistency(order_id)
+        result["three_party"] = three_party
+        result["client_roots"] = {
+            "user": three_party.get("user_root"),
+            "rider": three_party.get("rider_root")
+        }
+        result["all_match"] = three_party.get("all_match")
 
         return jsonify({
-            "success": result["success"] and all_match,
+            "success": result["success"],
             "message": "integrity verification completed" if result["success"] else "integrity verification failed",
             "data": result
         }), 200
@@ -1460,27 +1553,95 @@ def admin_trace():
 
 
 
+@app.route("/admin/three_party_consistency/<order_id>", methods=["GET", "POST"])
+@admin_required
+def admin_three_party_consistency(order_id):
+    """管理员端三端一致性验证。
+
+    对同一订单，比对：
+    1. 管理员/服务器当前根据消息哈希计算的 Merkle Root；
+    2. 用户端上报的 Merkle Root；
+    3. 骑手端上报的 Merkle Root。
+
+    三者全部存在且完全一致，才判定为“三端消息视图一致”。
+    """
+    try:
+        order = get_order_by_order_id(order_id)
+        if not order:
+            return jsonify({"success": False, "message": "order not found"}), 404
+
+        result = build_three_party_consistency(order_id)
+        action = "THREE_PARTY_CONSISTENCY_OK" if result["all_match"] else "THREE_PARTY_CONSISTENCY_FAIL"
+
+        # POST 代表管理员主动发起验证，需要写审计日志；GET 只读取当前状态。
+        if request.method == "POST":
+            log_admin_action(
+                action=action,
+                detail={
+                    "message_count": result["message_count"],
+                    "all_present": result["all_present"],
+                    "all_match": result["all_match"],
+                    "missing_roles": result["missing_roles"],
+                    "admin_username": session.get("admin_username", "unknown"),
+                    "policy": result["policy"]
+                },
+                order_id=order_id
+            )
+
+        return jsonify({
+            "success": True,
+            "message": "three-party consistency checked",
+            "data": result
+        }), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
 # ====================== 客户端 Merkle Root 上报 ======================
 
 @app.route("/report_merkle_root", methods=["POST"])
 def report_merkle_root():
-    """用户端/骑手端上报本地保存的 Merkle Root，存入 audit_logs 供管理员三方比对"""
-    data = request.json
-    if not data:
-        return jsonify({"success": False, "message": "请求体不能为空"}), 400
+    """用户端/骑手端上报本端 Merkle Root，供管理员做三端一致性比对。
+
+    该接口只接收订单号、角色、Root，不接收 PID 或聊天明文。
+    """
+    data = request.json or {}
     order_id = (data.get("order_id") or "").strip()
     merkle_root = (data.get("merkle_root") or "").strip()
     role = (data.get("role") or "").strip()
+    message_count = data.get("message_count")
+
     if not order_id or not merkle_root or not role:
         return jsonify({"success": False, "message": "order_id, merkle_root, role 均为必填"}), 400
     if role not in ("user", "rider"):
         return jsonify({"success": False, "message": "role 必须为 user 或 rider"}), 400
+    if not get_order_by_order_id(order_id):
+        return jsonify({"success": False, "message": "order not found"}), 404
+
+    # 用户端只能为自己的订单上报 Root；骑手端仍不接触 PID 或用户身份。
+    if role == "user":
+        order = get_order_by_order_id(order_id)
+        session_user_id = session.get("user_id")
+        if not session_user_id or int(session_user_id) != int(order["user_id"]):
+            return jsonify({"success": False, "message": "只能为自己的订单上报用户端 Root"}), 403
+
     try:
+        detail = {
+            "role": role,
+            "message_count": message_count,
+            "source": "client_local_view",
+            "policy": "three_party_root_consistency"
+        }
         execute(
             "INSERT INTO audit_logs (order_id, action, detail, merkle_root) VALUES (?, ?, ?, ?)",
-            (order_id, "CLIENT_ROOT_REPORTED", json.dumps({"role": role}, ensure_ascii=False), merkle_root)
+            (order_id, "CLIENT_ROOT_REPORTED", json.dumps(detail, ensure_ascii=False), merkle_root)
         )
-        return jsonify({"success": True, "message": "merkle root reported"}), 200
+        return jsonify({
+            "success": True,
+            "message": "merkle root reported",
+            "data": {"order_id": order_id, "role": role, "merkle_root": merkle_root}
+        }), 200
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 

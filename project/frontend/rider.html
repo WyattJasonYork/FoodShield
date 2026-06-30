@@ -165,6 +165,15 @@
                     <div id="chatStatusBox" class="result-box">尚未进入聊天房间</div>
                 </div>
 
+                <div class="mt-3">
+                    <label class="form-label">骑手端 Merkle Root</label>
+                    <div id="riderMerkleRootBox" class="result-box">尚未同步消息 Root</div>
+                    <div class="d-flex gap-2 flex-wrap mt-2">
+                        <button class="btn btn-sm btn-outline-primary" onclick="manualReportRiderRoot()">上报骑手端 Root</button>
+                        <span class="section-tip align-self-center">用于管理员端“三端一致性验证”。</span>
+                    </div>
+                </div>
+
                 <div class="d-flex gap-2 flex-wrap mt-3">
                     <button id="joinChatBtn" class="btn btn-primary" onclick="handleJoinChat()" disabled>
                         进入聊天房间
@@ -543,15 +552,39 @@ async function submitRiderTraceRequest() {
     }
 }
 
+function updateRiderMerkleRootBox(root) {
+    const box = document.getElementById("riderMerkleRootBox");
+    if (!box) return;
+    box.innerHTML = root
+        ? `<span class="small text-break">${escapeHtml(root)}</span>`
+        : "尚未同步消息 Root";
+}
+
 async function reportMerkleRoot(orderId, merkleRoot, role) {
     try {
-        await fetch(`${BASE_URL}/report_merkle_root`, {
+        const res = await fetch(`${BASE_URL}/report_merkle_root`, {
             method: "POST",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify({ order_id: orderId, merkle_root: merkleRoot, role: role })
         });
+        return await res.json();
     } catch (e) {
         console.warn("Merkle root report failed:", e);
+        return { success: false, message: String(e) };
+    }
+}
+
+async function manualReportRiderRoot() {
+    const orderId = currentOrderId || document.getElementById("currentOrderId").value.trim();
+    const root = currentMerkleRoot || (orderId ? localStorage.getItem("merkle_root_" + orderId) : null);
+    if (!orderId) return showAlert("warning", "请先选择或接单一个订单。 ");
+    if (!root) return showAlert("warning", "当前骑手端还没有可上报的 Merkle Root。请先进入聊天并发送/接收一条消息。 ");
+    const result = await reportMerkleRoot(orderId, root, "rider");
+    if (result.success) {
+        updateRiderMerkleRootBox(root);
+        showAlert("success", "骑手端 Merkle Root 已上报，管理员端可进行三端一致性验证。 ");
+    } else {
+        showAlert("danger", result.message || "骑手端 Root 上报失败。 ");
     }
 }
 
@@ -582,6 +615,7 @@ socket.on("join_result", async (res) => {
         const savedRoot = localStorage.getItem("merkle_root_" + res.order_id);
         if (savedRoot) {
             currentMerkleRoot = savedRoot;
+            updateRiderMerkleRootBox(savedRoot);
             reportMerkleRoot(res.order_id, savedRoot, "rider");
         }
         await loadMessageHistory();
@@ -607,6 +641,7 @@ socket.on("receive_message", (msg) => {
         currentMerkleRoot = msg.merkle_root;
         currentOrderId = msg.order_id || currentOrderId;
         localStorage.setItem("merkle_root_" + currentOrderId, currentMerkleRoot);
+        updateRiderMerkleRootBox(currentMerkleRoot);
         reportMerkleRoot(currentOrderId, currentMerkleRoot, "rider");
     }
 });
@@ -617,6 +652,7 @@ socket.on("error_message", (msg) => {
 
 window.onload = () => {
     enableChatInput(false);
+    updateRiderMerkleRootBox(null);
     loadPendingOrders();
 };
 </script>

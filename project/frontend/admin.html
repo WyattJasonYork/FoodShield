@@ -169,8 +169,17 @@
         <div class="card p-3">
             <h5 class="fw-bold mb-3">🛡️ 安全审计 (Merkle Tree)</h5>
             <button class="btn btn-outline-success mb-2 w-100" onclick="sealLogs()">1. 生成快照 (Snapshot)</button>
-            <button class="btn btn-outline-warning w-100" onclick="verifyLogs()">2. 验证完整性</button>
+            <button class="btn btn-outline-warning mb-2 w-100" onclick="verifyLogs()">2. 验证完整性</button>
+            <button class="btn btn-outline-primary w-100" onclick="verifyThreePartyConsistency()">3. 三端 Root 一致性验证</button>
             <div id="auditResult" class="mt-3 small"></div>
+        </div>
+
+        <div class="card p-3 border-primary">
+            <h5 class="fw-bold mb-3 text-primary">🔗 三端一致性</h5>
+            <p class="small text-muted mb-2">
+                对同一订单比对管理员端当前 Root、用户端上报 Root、骑手端上报 Root。三者完全一致才说明三方消息视图一致。
+            </p>
+            <div id="threePartyResult" class="small text-muted">请先输入订单号，再点击“三端 Root 一致性验证”。</div>
         </div>
 
         <div class="card p-3 border-warning">
@@ -657,6 +666,59 @@ async function verifyLogs() {
         await loadOrders();
     } catch (e) {
         showAlert("danger", `验证请求失败：${escapeHtml(e.message)}`);
+    }
+}
+
+async function verifyThreePartyConsistency() {
+    const orderId = document.getElementById("orderIdInput").value.trim();
+    if (!orderId) {
+        return showAlert("warning", "请先输入订单号！");
+    }
+
+    const box = document.getElementById("threePartyResult");
+    box.innerHTML = `<div class="text-muted">正在执行三端一致性验证...</div>`;
+
+    try {
+        const json = await apiRequest(`/admin/three_party_consistency/${encodeURIComponent(orderId)}`, {
+            method: "POST"
+        });
+        const data = json.data || {};
+        const ok = !!data.all_match;
+        const missing = (data.missing_roles || []).join(", ") || "无";
+
+        box.innerHTML = `
+            <div class="${ok ? 'text-success' : 'text-danger'} fw-bold mb-2">
+                ${ok ? '✅ 三端 Root 一致：三方消息视图一致' : '❌ 三端 Root 不一致 / 有端未上报'}
+            </div>
+            <div>message_count: ${escapeHtml(data.message_count ?? '-')}</div>
+            <div>all_present: ${escapeHtml(data.all_present ?? '-')}</div>
+            <div>all_match: ${escapeHtml(data.all_match ?? '-')}</div>
+            <div>missing_roles: ${escapeHtml(missing)}</div>
+            <hr>
+            <div class="fw-bold">管理员端当前 Root</div>
+            <div class="merkle-root">${escapeHtml(data.admin_root || '-')}</div>
+            <div class="fw-bold mt-2">用户端上报 Root</div>
+            <div class="merkle-root">${escapeHtml(data.user_root || '-')}</div>
+            <div class="small text-muted">user_report_time: ${escapeHtml(data.user_report_time || '-')}</div>
+            <div class="fw-bold mt-2">骑手端上报 Root</div>
+            <div class="merkle-root">${escapeHtml(data.rider_root || '-')}</div>
+            <div class="small text-muted">rider_report_time: ${escapeHtml(data.rider_report_time || '-')}</div>
+            <div class="fw-bold mt-2">最近一次管理员快照 Root</div>
+            <div class="merkle-root">${escapeHtml(data.latest_snapshot_root || '-')}</div>
+        `;
+
+        document.getElementById("auditResult").innerHTML = `
+            <div class="${ok ? 'text-success' : 'text-danger'} fw-bold mb-2">
+                ${ok ? '✅ 三端一致性验证通过' : '❌ 三端一致性验证未通过'}
+            </div>
+            <div class="small text-muted">只有管理员端、用户端、骑手端 Root 同时一致，才认为同一订单三方消息完全一致。</div>
+        `;
+
+        await fetchAuditLogs(orderId);
+        await loadOrders();
+    } catch (e) {
+        box.innerHTML = `<div class="text-danger">三端一致性验证失败：${escapeHtml(e.message)}</div>`;
+        showAlert("danger", `三端一致性验证失败：${escapeHtml(e.message)}`);
     }
 }
 
