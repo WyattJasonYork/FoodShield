@@ -173,10 +173,24 @@
             <div id="auditResult" class="mt-3 small"></div>
         </div>
 
+        <div class="card p-3 border-warning">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="fw-bold mb-0 text-warning">📨 溯源申请审批</h5>
+                <button class="btn btn-sm btn-outline-warning" onclick="loadTraceRequests()">刷新</button>
+            </div>
+            <p class="small text-muted mb-2">
+                用户端和骑手端均可按订单号提交溯源申请；管理员审批后才执行条件溯源，全流程写入审计日志。
+            </p>
+            <div id="traceRequestList" class="small">
+                <div class="text-muted">点击刷新加载待审批申请。</div>
+            </div>
+        </div>
+
         <div class="card p-3 border-danger">
             <h5 class="fw-bold mb-3 text-danger">🚨 条件溯源</h5>
             <p class="small text-muted mb-2">
                 输入订单号和溯源原因，系统根据订单映射恢复真实身份，并记录 TRACE_SUCCESS / TRACE_FAIL 审计日志。
+                推荐先由用户端/骑手端提交申请，再由管理员审批触发。
             </p>
             <input type="text" id="traceOrderIdInput" class="form-control mb-2" placeholder="输入订单号（而不是 PID）">
             <input type="text" id="reasonInput" class="form-control mb-2" placeholder="输入溯源原因（如：投诉处理）">
@@ -270,6 +284,7 @@
         document.getElementById("adminUserBadge").style.display = "inline";
         document.getElementById("logoutBtn").style.display = "inline";
         loadOrders();
+        loadTraceRequests();
     }
 
     function showAdminLogin() {
@@ -642,6 +657,104 @@ async function verifyLogs() {
         await loadOrders();
     } catch (e) {
         showAlert("danger", `验证请求失败：${escapeHtml(e.message)}`);
+    }
+}
+
+function renderTraceResult(orderId, data, titleText = "TRACE_SUCCESS") {
+    const card = document.getElementById("traceResultCard");
+    const body = document.getElementById("traceResultBody");
+    const orders = data.orders || [];
+    const ordersHtml = orders.length > 0
+        ? `<ul class="mb-0">
+            ${orders.map(order => `
+                <li class="mb-2">
+                    <div><strong>order_id:</strong> <span class="hash-text">${escapeHtml(order.order_id)}</span></div>
+                    <div><strong>status:</strong> ${escapeHtml(order.status)}</div>
+                    <div><strong>created_at:</strong> ${escapeHtml(order.created_at)}</div>
+                </li>
+            `).join("")}
+        </ul>`
+        : `<div class="text-muted">无关联订单</div>`;
+
+    body.innerHTML = `
+        <div class="alert alert-danger">
+            <strong>${escapeHtml(titleText)}</strong>：已按订单号触发条件溯源；PID 仍由后端内部维护，不在管理员页面展示。
+        </div>
+        <div class="mb-2"><strong>触发订单号：</strong><span class="hash-text">${escapeHtml(orderId)}</span></div>
+        <div class="mb-2"><strong>用户名：</strong>${escapeHtml(data.username)}</div>
+        <div class="mb-2"><strong>用户ID：</strong>${escapeHtml(data.user_id)}</div>
+        <div class="mb-2"><strong>注册时间：</strong>${escapeHtml(data.created_at)}</div>
+        <div class="mb-2"><strong>关联订单：</strong></div>
+        ${ordersHtml}
+    `;
+    card.style.display = "block";
+}
+
+async function loadTraceRequests() {
+    const box = document.getElementById("traceRequestList");
+    if (!box) return;
+    box.innerHTML = `<div class="text-muted">加载中...</div>`;
+    try {
+        const json = await apiRequest("/admin/trace_requests?status=pending");
+        const requests = json.data || [];
+        if (requests.length === 0) {
+            box.innerHTML = `<div class="text-muted">暂无待审批溯源申请。</div>`;
+            return;
+        }
+        box.innerHTML = requests.map(req => `
+            <div class="border rounded p-2 mb-2 bg-light">
+                <div><strong>#${escapeHtml(req.id)}</strong> · ${escapeHtml(req.requester_role === "user" ? "用户端申请" : "骑手端申请")}</div>
+                <div>订单号：<span class="hash-text">${escapeHtml(req.order_id)}</span></div>
+                <div>订单状态：${escapeHtml(req.order_status || "-")}</div>
+                <div>申请原因：${escapeHtml(req.reason || "-")}</div>
+                <div>提交时间：${escapeHtml(req.created_at || "-")}</div>
+                <div class="d-flex gap-2 mt-2">
+                    <button class="btn btn-sm btn-danger" onclick="approveTraceRequest(${Number(req.id)})">同意并溯源</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="rejectTraceRequest(${Number(req.id)})">拒绝</button>
+                    <button class="btn btn-sm btn-outline-primary" onclick="fillOrderId('${escapeHtml(req.order_id)}')">查看订单</button>
+                </div>
+            </div>
+        `).join("");
+    } catch (e) {
+        box.innerHTML = `<div class="text-danger">加载失败：${escapeHtml(e.message)}</div>`;
+    }
+}
+
+async function approveTraceRequest(requestId) {
+    const admin_note = prompt("请输入审批备注（可选）：", "同意溯源申请") || "";
+    try {
+        const json = await apiRequest(`/admin/trace_requests/${requestId}/approve`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ admin_note })
+        });
+        const data = json.data || {};
+        const traceResult = data.trace_result || {};
+        const orderId = data.order_id || "";
+        renderTraceResult(orderId, traceResult, "TRACE_REQUEST_APPROVED");
+        document.getElementById("orderIdInput").value = orderId;
+        document.getElementById("traceOrderIdInput").value = orderId;
+        await fetchAuditLogs(orderId);
+        await loadTraceRequests();
+        await loadOrders();
+        showAlert("success", "已同意溯源申请并完成按订单号溯源。全流程已写入审计日志。");
+    } catch (e) {
+        showAlert("danger", `审批失败：${escapeHtml(e.message)}`);
+    }
+}
+
+async function rejectTraceRequest(requestId) {
+    const admin_note = prompt("请输入拒绝原因：", "证据不足，暂不触发溯源") || "证据不足，暂不触发溯源";
+    try {
+        await apiRequest(`/admin/trace_requests/${requestId}/reject`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ admin_note })
+        });
+        await loadTraceRequests();
+        showAlert("success", "已拒绝该溯源申请，并写入审计日志。");
+    } catch (e) {
+        showAlert("danger", `拒绝失败：${escapeHtml(e.message)}`);
     }
 }
 

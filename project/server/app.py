@@ -61,6 +61,21 @@ def ensure_schema_migrations():
             execute("ALTER TABLE orders ADD COLUMN tag TEXT NOT NULL DEFAULT ''")
         if "delivery_note" not in order_columns:
             execute("ALTER TABLE orders ADD COLUMN delivery_note TEXT NOT NULL DEFAULT ''")
+
+        # 条件溯源申请表：用户端/骑手端按订单号提交申请，管理员审批后溯源。
+        execute("""
+            CREATE TABLE IF NOT EXISTS trace_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_id TEXT NOT NULL,
+                requester_role TEXT NOT NULL CHECK (requester_role IN ('user', 'rider')),
+                reason TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending', 'approved', 'rejected')),
+                admin_note TEXT NOT NULL DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                reviewed_at TEXT
+            )
+        """)
     except Exception as exc:
         print(f"[schema migration skipped] {exc}")
 
@@ -754,6 +769,245 @@ def get_message_history(order_id):
 
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
+
+
+
+# ====================== 条件溯源申请 API ======================
+
+@app.route("/trace_requests", methods=["POST"])
+def submit_trace_request():
+    """用户端/骑手端提交条件溯源申请：只按订单号，不提交 PID。"""
+    ensure_schema_migrations()
+    data = request.json or {}
+    order_id = str(data.get("order_id", "")).strip()
+    requester_role = str(data.get("requester_role", "")).strip()
+    reason = str(data.get("reason", "")).strip()
+
+    if not order_id:
+        return jsonify({"success": False, "message": "order_id is required"}), 400
+    if requester_role not in ("user", "rider"):
+        return jsonify({"success": False, "message": "requester_role must be user or rider"}), 400
+    if not reason:
+        return jsonify({"success": False, "message": "reason is required"}), 400
+
+    order = get_order_by_order_id(order_id)
+    if not order:
+        return jsonify({"success": False, "message": "order not found"}), 404
+
+    # 用户端申请必须是当前登录用户自己的订单；骑手端不需要也不能提交用户身份信息。
+    if requester_role == "user":
+        session_user_id = session.get("user_id")
+        if not session_user_id:
+            return jsonify({"success": False, "message": "请先登录后再提交溯源申请"}), 401
+        if int(session_user_id) != int(order["user_id"]):
+            return jsonify({"success": False, "message": "只能为自己的订单提交溯源申请"}), 403
+
+    request_id = execute(
+        """
+        INSERT INTO trace_requests (order_id, requester_role, reason, status)
+        VALUES (?, ?, ?, 'pending')
+        """,
+        (order_id, requester_role, reason[:300])
+    )
+
+    log_admin_action(
+        action="TRACE_REQUEST_SUBMITTED",
+        detail={
+            "trace_request_id": request_id,
+            "requester_role": requester_role,
+            "reason": reason[:300],
+            "policy": "request_by_order_id_no_pid"
+        },
+        order_id=order_id
+    )
+
+    return jsonify({
+        "success": True,
+        "message": "trace request submitted successfully",
+        "data": {
+            "request_id": request_id,
+            "order_id": order_id,
+            "requester_role": requester_role,
+            "status": "pending"
+        }
+    }), 201
+
+
+@app.route("/admin/trace_requests", methods=["GET"])
+@admin_required
+def admin_get_trace_requests():
+    """管理员查看溯源申请列表：只展示订单号、申请角色、原因、状态，不展示 PID。"""
+    ensure_schema_migrations()
+    status = str(request.args.get("status", "pending")).strip()
+
+    sql = """
+        SELECT tr.id, tr.order_id, tr.requester_role, tr.reason, tr.status,
+               tr.admin_note, tr.created_at, tr.reviewed_at, o.status AS order_status
+        FROM trace_requests tr
+        LEFT JOIN orders o ON tr.order_id = o.order_id
+        WHERE 1 = 1
+    """
+    params = []
+    if status:
+        sql += " AND tr.status = ?"
+        params.append(status)
+    sql += " ORDER BY tr.id DESC LIMIT 100"
+
+    rows = query_all(sql, tuple(params))
+    return jsonify({
+        "success": True,
+        "message": "trace requests fetched successfully",
+        "data": [dict(row) for row in rows]
+    }), 200
+
+
+def perform_trace_by_order_id(order_id: str, reason: str, admin_username: str, trace_request_id=None):
+    """内部工具：管理员审批后按订单号触发溯源，不要求任何前端提交 PID。"""
+    order = get_order_by_order_id(order_id)
+    if not order:
+        log_admin_action(
+            action="TRACE_FAIL",
+            detail={
+                "order_id": order_id,
+                "reason": reason,
+                "admin_username": admin_username,
+                "trace_request_id": trace_request_id,
+                "reason_code": "order_not_found"
+            },
+            order_id=order_id
+        )
+        return None, (jsonify({"success": False, "message": "order not found"}), 404)
+
+    user = get_user_by_id(order["user_id"])
+    if not user:
+        log_admin_action(
+            action="TRACE_FAIL",
+            detail={
+                "order_id": order_id,
+                "reason": reason,
+                "admin_username": admin_username,
+                "trace_request_id": trace_request_id,
+                "reason_code": "user_not_found"
+            },
+            order_id=order_id
+        )
+        return None, (jsonify({"success": False, "message": "user not found"}), 404)
+
+    result = trace_pid(user["pid"])
+    log_admin_action(
+        action="TRACE_SUCCESS",
+        detail={
+            "order_id": order_id,
+            "reason": reason,
+            "admin_username": admin_username,
+            "trace_request_id": trace_request_id,
+            "user_id": result["user_id"],
+            "username": result["username"],
+            "policy": "trace_by_order_id_no_pid_input"
+        },
+        order_id=order_id
+    )
+    return result, None
+
+
+@app.route("/admin/trace_requests/<int:request_id>/approve", methods=["POST"])
+@admin_required
+def admin_approve_trace_request(request_id):
+    """管理员同意用户/骑手的溯源申请，并按订单号执行条件溯源。"""
+    ensure_schema_migrations()
+    data = request.json or {}
+    admin_note = str(data.get("admin_note", "")).strip()
+    req = query_one("SELECT * FROM trace_requests WHERE id = ?", (request_id,))
+    if not req:
+        return jsonify({"success": False, "message": "trace request not found"}), 404
+    if req["status"] != "pending":
+        return jsonify({"success": False, "message": f"request already {req['status']}"}), 400
+
+    admin_username = session.get("admin_username", "unknown")
+    reason = f"申请方：{req['requester_role']}；申请原因：{req['reason']}"
+    if admin_note:
+        reason += f"；管理员备注：{admin_note}"
+
+    result, error_response = perform_trace_by_order_id(req["order_id"], reason, admin_username, request_id)
+    if error_response:
+        return error_response
+
+    execute(
+        """
+        UPDATE trace_requests
+        SET status = 'approved', admin_note = ?, reviewed_at = ?
+        WHERE id = ?
+        """,
+        (admin_note[:300], now_iso(), request_id)
+    )
+
+    log_admin_action(
+        action="TRACE_REQUEST_APPROVED",
+        detail={
+            "trace_request_id": request_id,
+            "requester_role": req["requester_role"],
+            "reason": req["reason"],
+            "admin_note": admin_note[:300],
+            "admin_username": admin_username
+        },
+        order_id=req["order_id"]
+    )
+
+    return jsonify({
+        "success": True,
+        "message": "trace request approved and trace completed",
+        "data": {
+            "request_id": request_id,
+            "order_id": req["order_id"],
+            "requester_role": req["requester_role"],
+            "trace_result": result
+        }
+    }), 200
+
+
+@app.route("/admin/trace_requests/<int:request_id>/reject", methods=["POST"])
+@admin_required
+def admin_reject_trace_request(request_id):
+    """管理员拒绝溯源申请，只记录审计日志，不执行溯源。"""
+    ensure_schema_migrations()
+    data = request.json or {}
+    admin_note = str(data.get("admin_note", "")).strip() or "管理员拒绝该溯源申请"
+    req = query_one("SELECT * FROM trace_requests WHERE id = ?", (request_id,))
+    if not req:
+        return jsonify({"success": False, "message": "trace request not found"}), 404
+    if req["status"] != "pending":
+        return jsonify({"success": False, "message": f"request already {req['status']}"}), 400
+
+    execute(
+        """
+        UPDATE trace_requests
+        SET status = 'rejected', admin_note = ?, reviewed_at = ?
+        WHERE id = ?
+        """,
+        (admin_note[:300], now_iso(), request_id)
+    )
+
+    log_admin_action(
+        action="TRACE_REQUEST_REJECTED",
+        detail={
+            "trace_request_id": request_id,
+            "requester_role": req["requester_role"],
+            "reason": req["reason"],
+            "admin_note": admin_note[:300],
+            "admin_username": session.get("admin_username", "unknown")
+        },
+        order_id=req["order_id"]
+    )
+
+    return jsonify({
+        "success": True,
+        "message": "trace request rejected",
+        "data": {
+            "request_id": request_id,
+            "order_id": req["order_id"],
+            "status": "rejected"
+        }
+    }), 200
 
 
 @app.route("/admin/login", methods=["POST"])

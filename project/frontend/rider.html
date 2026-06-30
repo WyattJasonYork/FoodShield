@@ -192,6 +192,13 @@
                 <div class="section-tip mt-2">
                     当前阶段骑手端采用平台接单后入房的最小实现，用于完成第三周双向通信联调。
                 </div>
+
+                <hr>
+                <div class="step-title text-danger fs-5 mb-2">3. 提交溯源申请</div>
+                <div class="section-tip mb-2">骑手可针对当前订单提交投诉/异常申请，管理员按订单号审批溯源；骑手端不接触 PID 或用户真实身份。</div>
+                <textarea id="riderTraceReason" class="form-control mb-2" rows="2" placeholder="申请原因，例如：用户骚扰 / 订单异常 / 配送纠纷"></textarea>
+                <button id="riderTraceRequestBtn" class="btn btn-outline-danger w-100" onclick="submitRiderTraceRequest()">提交溯源申请</button>
+                <div id="riderTraceRequestResult" class="section-tip mt-2"></div>
             </div>
         </div>
     </div>
@@ -507,6 +514,33 @@ function handleSendMessage() {
     });
 
     contentInput.value = "";
+}
+
+async function submitRiderTraceRequest() {
+    const order_id = document.getElementById("currentOrderId").value.trim();
+    const reason = document.getElementById("riderTraceReason").value.trim();
+    if (!order_id) return showAlert("warning", "请先选择或接单一个订单。");
+    if (!reason) return showAlert("warning", "请填写溯源申请原因。");
+
+    setButtonLoading("riderTraceRequestBtn", "提交中...", true);
+    try {
+        const res = await fetch(`${BASE_URL}/trace_requests`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ order_id, requester_role: "rider", reason })
+        });
+        const result = await res.json();
+        if (result.success) {
+            document.getElementById("riderTraceRequestResult").innerHTML = `已提交，申请编号：${escapeHtml(result.data.request_id)}，等待管理员审批。`;
+            showAlert("success", "溯源申请已提交。骑手端只提交订单号和原因，不提交 PID。 ");
+        } else {
+            showAlert("danger", result.message || "提交溯源申请失败。");
+        }
+    } catch (e) {
+        showAlert("danger", "提交失败，请检查后端是否启动。");
+    } finally {
+        setButtonLoading("riderTraceRequestBtn", "提交中...", false);
+    }
 }
 
 async function reportMerkleRoot(orderId, merkleRoot, role) {

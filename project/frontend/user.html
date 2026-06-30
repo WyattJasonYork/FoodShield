@@ -148,6 +148,14 @@
                     <button class="btn btn-sm btn-outline-secondary" onclick="resetMyOrderSearch()">重置</button>
                 </div>
                 <div id="orderHistoryBox" class="result-box text-muted">登录后显示订单历史。</div>
+
+                <hr>
+                <div class="step-title text-danger fs-5 mb-2">6. 提交溯源申请</div>
+                <div class="section-tip mb-2">用户可按订单号提交投诉/异常申请，等待管理员审批后条件溯源；不需要也不能提交 PID。</div>
+                <input id="userTraceOrderId" type="text" class="form-control mb-2" placeholder="订单号（可从订单历史自动带入）">
+                <textarea id="userTraceReason" class="form-control mb-2" rows="2" placeholder="申请原因，例如：骑手骚扰 / 配送纠纷 / 异常订单"></textarea>
+                <button id="userTraceRequestBtn" class="btn btn-outline-danger w-100" onclick="submitUserTraceRequest()">提交溯源申请</button>
+                <div id="userTraceRequestResult" class="section-tip mt-2"></div>
             </div>
         </div>
 
@@ -409,6 +417,7 @@ async function handleCreateOrder() {
             document.getElementById("tokenBox").innerText = data.token;
             updateStatusBadge(data.status);
             fillVerifyFields(data.order_id, data.timestamp, data.token);
+            document.getElementById("userTraceOrderId").value = data.order_id;
             hasJoinedChatRoom = false;
             enableChatInput(false);
             updateChatStatus("订单已创建，请先验证并进入聊天房间。", "secondary");
@@ -542,6 +551,7 @@ function selectOrderFromHistory(order) {
     document.getElementById("tokenBox").innerText = order.token || "";
     updateStatusBadge(order.status);
     fillVerifyFields(order.order_id, order.token_timestamp, order.token);
+    document.getElementById("userTraceOrderId").value = order.order_id;
     showAlert("success", "已载入该订单认证信息。");
 }
 
@@ -620,6 +630,35 @@ function handleSendMessage() {
     if (!content) return showAlert("warning", "请输入消息内容。");
     socket.emit("send_message", { order_id, role: "user", content });
     contentInput.value = "";
+}
+
+async function submitUserTraceRequest() {
+    if (!currentUser) return showAlert("warning", "请先登录后再提交溯源申请。");
+    const order_id = document.getElementById("userTraceOrderId").value.trim() || document.getElementById("verifyOrderId").value.trim();
+    const reason = document.getElementById("userTraceReason").value.trim();
+    if (!order_id) return showAlert("warning", "请先选择或输入订单号。");
+    if (!reason) return showAlert("warning", "请填写溯源申请原因。");
+
+    setButtonLoading("userTraceRequestBtn", "提交中...", true);
+    try {
+        const res = await fetch(`${BASE_URL}/trace_requests`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            credentials: "include",
+            body: JSON.stringify({ order_id, requester_role: "user", reason })
+        });
+        const result = await res.json();
+        if (result.success) {
+            document.getElementById("userTraceRequestResult").innerHTML = `已提交，申请编号：${escapeHtml(result.data.request_id)}，等待管理员审批。`;
+            showAlert("success", "溯源申请已提交，管理员端可按订单号审批。PID 未向前端提交。");
+        } else {
+            showAlert("danger", result.message || "提交溯源申请失败。");
+        }
+    } catch (e) {
+        showAlert("danger", "提交失败，请检查后端是否启动。");
+    } finally {
+        setButtonLoading("userTraceRequestBtn", "提交中...", false);
+    }
 }
 
 async function reportMerkleRoot(orderId, merkleRoot, role) {

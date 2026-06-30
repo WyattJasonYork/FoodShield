@@ -46,3 +46,17 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     merkle_root TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS trace_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id TEXT NOT NULL,
+    requester_role TEXT NOT NULL
+        CHECK (requester_role IN ('user', 'rider')),
+    reason TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'approved', 'rejected')),
+    admin_note TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    reviewed_at TEXT,
+    FOREIGN KEY (order_id) REFERENCES orders(order_id)
+);
