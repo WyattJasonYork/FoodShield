@@ -60,11 +60,12 @@
             box-shadow: 0 4px 20px rgba(0,0,0,0.1);
         }
     </style>
+    <link href="/css/style.css?v=showcase" rel="stylesheet">
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container">
-        <a class="navbar-brand fw-bold" href="/">🛠 平台管理后台</a>
+        <a class="navbar-brand fw-bold" href="/">FoodShield 管理后台</a>
         <div class="navbar-nav ms-auto">
             <a class="nav-link" href="/user.html">用户端</a>
             <a class="nav-link" href="/rider.html">骑手端</a>
@@ -80,7 +81,7 @@
 <!-- 管理员登录界面 -->
 <div id="adminLogin" class="login-container">
     <div class="card login-card p-4">
-        <h4 class="text-center mb-3">🔐 管理员登录</h4>
+        <h4 class="text-center mb-3">管理员登录</h4>
         <p class="text-muted text-center small mb-4">请输入管理员账号和密码</p>
         <div id="loginAlertBox"></div>
         <div class="mb-3">
@@ -99,9 +100,21 @@
 
 <!-- 管理面板（登录后可见） -->
 <div id="adminPanel" style="display:none;">
-<div class="container mt-4">
+<div class="container page-shell">
+    <section class="page-hero">
+        <div class="page-kicker">管理员端 · 哈希审计与条件溯源</div>
+        <h2 class="page-title">可信日志、Merkle 完整性与审批式溯源</h2>
+        <p class="page-subtitle">管理员端默认不读取通信明文，不展示 PID、Token、备注或标签；通过消息 Hash、审计动作和 Merkle Root 完成竞赛演示中的安全验证闭环。</p>
+        <div class="metric-strip">
+            <div class="metric-item"><strong>Hash-only 审计</strong><span>通信记录只展示哈希与元数据</span></div>
+            <div class="metric-item"><strong>Merkle 快照</strong><span>生成 Root 并验证日志完整性</span></div>
+            <div class="metric-item"><strong>三端一致性</strong><span>比对用户、骑手、管理端 Root</span></div>
+            <div class="metric-item"><strong>审批式溯源</strong><span>申请通过后才恢复真实身份</span></div>
+        </div>
+    </section>
+
     <div class="card p-3 mb-4" id="adminLoginCard">
-        <h5 class="fw-bold mb-3">🔐 管理员登录</h5>
+        <h5 class="fw-bold mb-3">管理员登录</h5>
 
 
     <div class="mb-3">

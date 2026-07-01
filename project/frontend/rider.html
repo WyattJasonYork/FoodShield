@@ -88,11 +88,12 @@
             padding: 0.45em 0.75em;
         }
     </style>
+    <link href="/css/style.css?v=showcase" rel="stylesheet">
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container">
-        <a class="navbar-brand fw-bold" href="/">🍔 匿名外卖</a>
+        <a class="navbar-brand fw-bold" href="/">FoodShield</a>
         <div class="navbar-nav ms-auto">
             <a class="nav-link" href="/user.html">用户端</a>
             <a class="nav-link active" href="/rider.html">骑手端</a>
@@ -101,11 +102,18 @@
     </div>
 </nav>
 
-<div class="container py-4">
-    <div class="mb-4">
-        <h2 class="page-title">骑手端 · 接单与匿名通信</h2>
-        <div class="text-muted">流程：查看待接订单 → 接单 → 进入订单聊天房间 → 发送消息</div>
-    </div>
+<div class="container page-shell">
+    <section class="page-hero">
+        <div class="page-kicker">骑手端 · 订单级匿名会话</div>
+        <h2 class="page-title">匿名接单与实时配送沟通</h2>
+        <p class="page-subtitle">骑手只接触订单级会话与配送说明，不接触用户 PID、真实身份或历史关联；消息 Root 可上报给管理员端做三端一致性验证。</p>
+        <div class="metric-strip">
+            <div class="metric-item"><strong>匿名订单别名</strong><span>同一用户多订单也呈现不同会话名</span></div>
+            <div class="metric-item"><strong>最小可见信息</strong><span>只展示配送必要字段</span></div>
+            <div class="metric-item"><strong>实时通信</strong><span>Socket.IO 订单房间收发消息</span></div>
+            <div class="metric-item"><strong>异常申请</strong><span>按订单号提交条件溯源请求</span></div>
+        </div>
+    </section>
 
     <div id="alertBox"></div>
 

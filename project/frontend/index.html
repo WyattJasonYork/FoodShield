@@ -3,25 +3,192 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>外卖匿名订单认证系统 - 演示入口</title>
+    <title>FoodShield - 匿名订单认证与可信审计系统</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="/css/style.css" rel="stylesheet">
+    <link href="/css/style.css?v=showcase" rel="stylesheet">
     <style>
-        body {
-            background: #f5f7fb;
+        .landing-hero {
+            position: relative;
+            min-height: calc(100vh - 72px);
+            padding: 48px 0 38px;
+            overflow: hidden;
         }
-        .hero {
-            background: linear-gradient(135deg, #ff6b00, #00b14f);
-            color: white;
-            padding: 80px 20px;
-            border-radius: 20px;
+
+        .landing-hero::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(110deg, rgba(19, 38, 28, 0.90), rgba(17, 63, 50, 0.74), rgba(15, 35, 57, 0.90)),
+                url("/css/foodshield-hero.png");
+            background-position: center;
+            background-size: cover;
+            z-index: -2;
+        }
+
+        .landing-hero::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+                linear-gradient(0deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 56px 56px;
+            z-index: -1;
+            opacity: 0.45;
+        }
+
+        .hero-panel {
+            max-width: 1040px;
+            color: #fff;
+        }
+
+        .hero-title {
+            max-width: 860px;
+            font-size: clamp(2.2rem, 5vw, 4.8rem);
+            font-weight: 950;
+            line-height: 1.06;
+            letter-spacing: 0;
+        }
+
+        .hero-copy {
+            max-width: 760px;
+            margin: 18px 0 0;
+            color: rgba(255, 255, 255, 0.84);
+            font-size: clamp(1rem, 2vw, 1.22rem);
+            line-height: 1.85;
+        }
+
+        .hero-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.8fr);
+            gap: 24px;
+            align-items: end;
+            margin-top: 46px;
+        }
+
+        .entry-panel {
+            padding: 18px;
+            border: 1px solid rgba(255, 255, 255, 0.20);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(14px);
+        }
+
+        .entry-button {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            min-height: 68px;
+            padding: 14px 16px;
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.10);
+        }
+
+        .entry-button + .entry-button {
+            margin-top: 12px;
+        }
+
+        .entry-button:hover {
+            color: #ffffff;
+            transform: translateY(-1px);
+            background: rgba(255, 255, 255, 0.18);
+        }
+
+        .entry-button strong {
+            display: block;
+            font-size: 1.02rem;
+        }
+
+        .entry-button span {
+            color: rgba(255, 255, 255, 0.68);
+            font-size: 0.86rem;
+        }
+
+        .arrow-mark {
+            font-size: 1.6rem;
+            line-height: 1;
+        }
+
+        .security-stack {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 28px;
+        }
+
+        .stack-item {
+            min-height: 122px;
+            padding: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.19);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+            backdrop-filter: blur(12px);
+        }
+
+        .stack-item b {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 1rem;
+        }
+
+        .stack-item p {
+            margin: 0;
+            color: rgba(255, 255, 255, 0.72);
+            font-size: 0.88rem;
+            line-height: 1.65;
+        }
+
+        @media (max-width: 991.98px) {
+            .landing-hero {
+                min-height: auto;
+            }
+
+            .hero-grid,
+            .security-stack {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 575.98px) {
+            .landing-hero {
+                padding: 34px 0 28px;
+            }
+
+            .hero-title {
+                font-size: 2.2rem;
+            }
+
+            .hero-copy,
+            .stack-item p,
+            .entry-button span {
+                white-space: normal;
+                word-break: break-word;
+                overflow-wrap: anywhere;
+            }
+
+            .hero-grid {
+                gap: 16px;
+                margin-top: 28px;
+            }
+
+            .entry-panel,
+            .entry-button,
+            .stack-item {
+                width: 100%;
+                min-width: 0;
+            }
         }
     </style>
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container">
-        <a class="navbar-brand fw-bold" href="/">🍔 匿名外卖</a>
+        <a class="navbar-brand fw-bold" href="/">FoodShield</a>
         <div class="navbar-nav ms-auto">
             <a class="nav-link" href="/user.html">用户端</a>
             <a class="nav-link" href="/rider.html">骑手端</a>
@@ -30,20 +197,55 @@
     </div>
 </nav>
 
-<div class="container py-5">
-    <div class="hero text-center">
-        <h1 class="display-4 fw-bold">外卖匿名订单认证系统</h1>
-        <p class="lead mt-3">信安赛作品 · 匿名通信 + 可控溯源 + 防篡改日志</p>
-        <div class="mt-5 d-grid gap-3 col-8 mx-auto">
-            <a href="/user.html" class="btn btn-light btn-lg">👤 用户端</a>
-            <a href="/rider.html" class="btn btn-light btn-lg">🛵 骑手端</a>
-            <a href="/admin.html" class="btn btn-light btn-lg">🛠 管理员端</a>
+<main class="landing-hero">
+    <div class="container">
+        <section class="hero-panel">
+            <div class="page-kicker">信息安全竞赛作品 · 外卖订单隐私保护</div>
+            <h1 class="hero-title">FoodShield</h1>
+            <p class="hero-copy">
+                面向外卖订单通信场景的匿名订单认证与可信审计系统：日常通信隐藏真实身份，异常争议可审批溯源，消息记录通过国密算法与 Merkle Root 支撑完整性验证。
+            </p>
+        </section>
+
+        <div class="hero-grid">
+            <section>
+                <div class="security-stack">
+                    <div class="stack-item">
+                        <b>匿名 PID</b>
+                        <p>后端生成并绑定匿名身份，普通用户与骑手界面不暴露真实身份映射。</p>
+                    </div>
+                    <div class="stack-item">
+                        <b>订单 Token</b>
+                        <p>基于订单号、时间戳与身份凭证进行认证，拦截伪造与篡改。</p>
+                    </div>
+                    <div class="stack-item">
+                        <b>SM4 加密存储</b>
+                        <p>聊天内容入库前加密保存，管理员审计侧默认只看哈希与元数据。</p>
+                    </div>
+                    <div class="stack-item">
+                        <b>Merkle 审计</b>
+                        <p>以消息哈希构建 Root，支持快照、完整性验证与三端一致性比对。</p>
+                    </div>
+                </div>
+            </section>
+
+            <aside class="entry-panel">
+                <a class="entry-button" href="/user.html">
+                    <span><strong>用户端演示</strong><span>注册登录、创建订单、Token 验证、匿名聊天</span></span>
+                    <span class="arrow-mark">→</span>
+                </a>
+                <a class="entry-button" href="/rider.html">
+                    <span><strong>骑手端演示</strong><span>匿名接单、订单房间通信、溯源申请</span></span>
+                    <span class="arrow-mark">→</span>
+                </a>
+                <a class="entry-button" href="/admin.html">
+                    <span><strong>管理员端演示</strong><span>哈希审计、Merkle 校验、条件溯源审批</span></span>
+                    <span class="arrow-mark">→</span>
+                </a>
+            </aside>
         </div>
     </div>
-
-
-    </div>
-</div>
+</main>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

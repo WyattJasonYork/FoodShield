@@ -29,11 +29,12 @@
         #chatMessages { min-height: 260px; max-height: 420px; overflow-y: auto; background: #ffffff; }
         .order-history-card { border: 1px solid #e9ecef; border-radius: 12px; padding: 12px; margin-bottom: 10px; background: #fff; }
     </style>
+    <link href="/css/style.css?v=showcase" rel="stylesheet">
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container">
-        <a class="navbar-brand fw-bold" href="/">🍔 FoodShield</a>
+        <a class="navbar-brand fw-bold" href="/">FoodShield</a>
         <div class="navbar-nav ms-auto">
             <a class="nav-link active" href="/user.html">用户端</a>
             <a class="nav-link" href="/rider.html">骑手端</a>
@@ -42,11 +43,18 @@
     </div>
 </nav>
 
-<div class="container py-4">
-    <div class="mb-4">
-        <h2 class="page-title">用户端 · 匿名订单认证流程演示</h2>
-        <div class="text-muted">按顺序完成：注册/登录 → 创建订单 → 认证验证 → 匿名聊天。PID 由后端维护，用户端默认不展示。</div>
-    </div>
+<div class="container page-shell">
+    <section class="page-hero">
+        <div class="page-kicker">用户端 · 匿名订单认证</div>
+        <h2 class="page-title">匿名下单与可信 Token 验证</h2>
+        <p class="page-subtitle">从注册登录、创建订单到进入匿名聊天房间，用户端始终不展示 PID；身份绑定、订单认证与审计 Root 均由后端协同完成。</p>
+        <div class="metric-strip">
+            <div class="metric-item"><strong>PID 后端托管</strong><span>用户界面不暴露真实身份映射</span></div>
+            <div class="metric-item"><strong>订单 Token</strong><span>验证订单归属与篡改风险</span></div>
+            <div class="metric-item"><strong>私有订单历史</strong><span>备注与标签仅用户端可见</span></div>
+            <div class="metric-item"><strong>Root 上报</strong><span>支撑管理员三端一致性校验</span></div>
+        </div>
+    </section>
 
     <div id="alertBox"></div>
 
