@@ -4,7 +4,7 @@ from project.crypto.sm_utils import sm3_strhash
 def generate_hash(data: str) -> str:
     """
     基础 Hash 生成函数，用于计算消息 Hash、构建 Merkle Tree
-    使用国密 SM3 替代 SHA-256
+    使用国密 SM3
     :param data: 需要计算哈希值的原始字符串
     :return: 64位十六进制字符串
     """

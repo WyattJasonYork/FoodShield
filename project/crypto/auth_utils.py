@@ -4,7 +4,7 @@ from project.crypto.sm_utils import SM3Hash
 class HMACAuth:
     """
     统一的HMAC签名与验证逻辑
-    使用国密 HMAC-SM3 替代 HMAC-SHA256
+    使用国密 HMAC-SM3
     """
 
     @staticmethod

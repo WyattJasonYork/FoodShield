@@ -113,30 +113,7 @@
         </div>
     </section>
 
-    <div class="card p-3 mb-4" id="adminLoginCard">
-        <h5 class="fw-bold mb-3">管理员登录</h5>
-
-
-    <div class="mb-3">
-        <label class="form-label">用户名</label>
-        <input type="text" class="form-control" id="adminUsername" value="admin">
-    </div>
-
-    <div class="mb-3">
-        <label class="form-label">密码</label>
-        <input type="password" class="form-control" id="adminPassword" value="admin123456">
-    </div>
-
-    <button class="btn btn-primary" onclick="adminLogin()">登录</button>
-
-    <div class="mt-3" id="adminLoginMsg"></div>
-</div>
-
-<div class="alert alert-success d-none" id="adminStatusBox">
-    当前已登录管理员：<span id="adminStatusName"></span>
-</div>
-
-<div class="row d-none" id="adminMain">
+<div class="row" id="adminMain">
     <div class="col-lg-4">
         <div class="card p-3">
             <div class="d-flex justify-content-between align-items-center mb-3">
@@ -390,66 +367,6 @@
         }
 
         return json;
-    }
-
-    async function checkAdminSession() {
-        try {
-            const json = await apiRequest("/admin/session");
-
-            if (json.success && json.data && json.data.is_admin) {
-                document.getElementById("adminLoginCard").classList.add("d-none");
-                document.getElementById("adminStatusBox").classList.remove("d-none");
-                document.getElementById("adminMain").classList.remove("d-none");
-                document.getElementById("adminStatusName").innerText =
-                    json.data.admin_username || "admin";
-
-                await loadOrders();
-                return true;
-            }
-
-            document.getElementById("adminLoginCard").classList.remove("d-none");
-            document.getElementById("adminStatusBox").classList.add("d-none");
-            document.getElementById("adminMain").classList.add("d-none");
-            return false;
-        } catch (e) {
-            document.getElementById("adminLoginCard").classList.remove("d-none");
-            document.getElementById("adminStatusBox").classList.add("d-none");
-            document.getElementById("adminMain").classList.add("d-none");
-            return false;
-        }
-    }
-
-    async function adminLogin() {
-        const username = document.getElementById("adminUsername").value.trim();
-        const password = document.getElementById("adminPassword").value.trim();
-        const msgBox = document.getElementById("adminLoginMsg");
-
-        if (!username || !password) {
-            msgBox.innerHTML = `<span class="text-danger">请输入用户名和密码</span>`;
-            return;
-        }
-
-        try {
-            const json = await apiRequest("/admin/login", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    username,
-                    password
-                })
-            });
-
-            if (json.success) {
-                msgBox.innerHTML = `<span class="text-success">登录成功</span>`;
-                await checkAdminSession();
-            } else {
-                msgBox.innerHTML = `<span class="text-danger">登录失败：${escapeHtml(json.message)}</span>`;
-            }
-        } catch (e) {
-            msgBox.innerHTML = `<span class="text-danger">登录失败：${escapeHtml(e.message)}</span>`;
-        }
     }
 
     function fillOrderId(orderId) {

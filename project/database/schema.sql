@@ -9,10 +9,21 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS riders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    rider_pid TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL DEFAULT '',
+    salt TEXT NOT NULL DEFAULT '',
+    device_fingerprint TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     order_id TEXT NOT NULL UNIQUE,
     user_id INTEGER NOT NULL,
+    rider_id INTEGER,
     token TEXT,
     token_timestamp TEXT,
     remark TEXT NOT NULL DEFAULT '',
@@ -21,7 +32,8 @@ CREATE TABLE IF NOT EXISTS orders (
     status TEXT NOT NULL DEFAULT 'created'
         CHECK (status IN ('created', 'taken', 'delivering', 'completed', 'cancelled')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (rider_id) REFERENCES riders(id)
 );
 
 CREATE TABLE IF NOT EXISTS messages (

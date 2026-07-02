@@ -13,17 +13,24 @@ import secrets
 
 from project.database.db import init_db, execute, query_one, query_all
 from project.crypto.pid import generate_pid
-from project.crypto.token_utils import generate_token, verify_token
+from project.crypto.token_utils import DEFAULT_ORDER_KEY, generate_token, verify_token
 from project.crypto.merkle import hash_message, build_merkle_root
 from project.crypto.sm_utils import sm4_encrypt, sm4_decrypt, sm3_strhash
 from project.server.logger import create_merkle_snapshot, verify_order_integrity
 
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = "foodshield-secret-key"
-app.config["ADMIN_USERNAME"] = os.getenv("FOODSHIELD_ADMIN_USERNAME", "admin")
-app.config["ADMIN_PASSWORD"] = os.getenv("FOODSHIELD_ADMIN_PASSWORD", "admin123456")
-app.config["ORDER_ALIAS_SECRET"] = os.getenv("FOODSHIELD_ORDER_ALIAS_SECRET", "foodshield-order-alias-secret")
+DEFAULT_SECRET_KEY = "foodshield-secret-key"
+DEFAULT_ADMIN_USERNAME = "admin"
+DEFAULT_ADMIN_PASSWORD = "admin123456"
+DEFAULT_ORDER_ALIAS_SECRET = "foodshield-order-alias-secret"
+DEFAULT_MASTER_KEY = "FoodShield"
+
+app.config["SECRET_KEY"] = os.getenv("FOODSHIELD_SECRET_KEY", DEFAULT_SECRET_KEY)
+app.config["ADMIN_USERNAME"] = os.getenv("FOODSHIELD_ADMIN_USERNAME", DEFAULT_ADMIN_USERNAME)
+app.config["ADMIN_PASSWORD"] = os.getenv("FOODSHIELD_ADMIN_PASSWORD", DEFAULT_ADMIN_PASSWORD)
+app.config["ORDER_ALIAS_SECRET"] = os.getenv("FOODSHIELD_ORDER_ALIAS_SECRET", DEFAULT_ORDER_ALIAS_SECRET)
+app.config["MASTER_KEY"] = os.getenv("FOODSHIELD_MASTER_KEY", DEFAULT_MASTER_KEY)
 
 CORS(app)
 socketio = SocketIO(
@@ -31,12 +38,34 @@ socketio = SocketIO(
     cors_allowed_origins="*",
     async_mode="threading",
     manage_session=False,
-    logger=True,
-    engineio_logger=True
+    logger=os.getenv("FOODSHIELD_SOCKETIO_DEBUG", "0") == "1",
+    engineio_logger=os.getenv("FOODSHIELD_SOCKETIO_DEBUG", "0") == "1"
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 FRONTEND_DIR = BASE_DIR / "project" / "frontend"
+
+
+def warn_default_config():
+    """启动时提示演示默认配置，便于答辩和部署前自检。"""
+    checks = [
+        ("FOODSHIELD_SECRET_KEY", app.config["SECRET_KEY"], DEFAULT_SECRET_KEY),
+        ("FOODSHIELD_ADMIN_USERNAME", app.config["ADMIN_USERNAME"], DEFAULT_ADMIN_USERNAME),
+        ("FOODSHIELD_ADMIN_PASSWORD", app.config["ADMIN_PASSWORD"], DEFAULT_ADMIN_PASSWORD),
+        ("FOODSHIELD_ORDER_KEY", os.getenv("FOODSHIELD_ORDER_KEY", DEFAULT_ORDER_KEY), DEFAULT_ORDER_KEY),
+        ("FOODSHIELD_MASTER_KEY", app.config["MASTER_KEY"], DEFAULT_MASTER_KEY),
+        ("FOODSHIELD_ORDER_ALIAS_SECRET", app.config["ORDER_ALIAS_SECRET"], DEFAULT_ORDER_ALIAS_SECRET),
+        ("FOODSHIELD_SM4_KEY", os.getenv("FOODSHIELD_SM4_KEY", "FoodShieldSM4Key"), "FoodShieldSM4Key"),
+    ]
+    default_items = [name for name, value, default in checks if value == default]
+    if not default_items:
+        print("[FoodShield config] all sensitive settings are provided by environment variables.")
+        return
+
+    red = "\033[91m"
+    reset = "\033[0m"
+    print(red + "[FoodShield config warning] default demo secrets are in use: " + ", ".join(default_items) + reset)
+    print(red + "Set these environment variables before production or public-network demos." + reset)
 
 
 def ensure_schema_migrations():
@@ -54,7 +83,21 @@ def ensure_schema_migrations():
         if "device_fingerprint" not in user_columns:
             execute("ALTER TABLE users ADD COLUMN device_fingerprint TEXT NOT NULL DEFAULT ''")
 
+        execute("""
+            CREATE TABLE IF NOT EXISTS riders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE,
+                rider_pid TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL DEFAULT '',
+                salt TEXT NOT NULL DEFAULT '',
+                device_fingerprint TEXT NOT NULL DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         order_columns = {row["name"] for row in query_all("PRAGMA table_info(orders)")}
+        if "rider_id" not in order_columns:
+            execute("ALTER TABLE orders ADD COLUMN rider_id INTEGER")
         if "remark" not in order_columns:
             execute("ALTER TABLE orders ADD COLUMN remark TEXT NOT NULL DEFAULT ''")
         if "tag" not in order_columns:
@@ -84,6 +127,10 @@ def get_user_by_id(user_id: int):
     return query_one("SELECT * FROM users WHERE id = ?", (user_id,))
 
 
+def get_rider_by_id(rider_id: int):
+    return query_one("SELECT * FROM riders WHERE id = ?", (rider_id,))
+
+
 def user_required(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -96,11 +143,30 @@ def user_required(func):
     return wrapper
 
 
+def rider_required(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if not session.get("rider_id"):
+            return jsonify({
+                "success": False,
+                "message": "请先登录骑手账号后再操作"
+            }), 401
+        return func(*args, **kwargs)
+    return wrapper
+
+
 def get_current_user():
     user_id = session.get("user_id")
     if not user_id:
         return None
     return get_user_by_id(user_id)
+
+
+def get_current_rider():
+    rider_id = session.get("rider_id")
+    if not rider_id:
+        return None
+    return get_rider_by_id(rider_id)
 
 
 def public_message(msg: dict):
@@ -480,7 +546,7 @@ def register():
             (username, temp_pid, password_hash, salt, machine_fp)
         )
 
-        pid_result = generate_pid("FoodShield", str(user_id))
+        pid_result = generate_pid(app.config["MASTER_KEY"], str(user_id))
         pid = pid_result["pid"]
         execute("UPDATE users SET pid = ? WHERE id = ?", (pid, user_id))
 
@@ -603,6 +669,163 @@ def logout():
     session.pop("user_id", None)
     session.pop("username", None)
     return jsonify({"success": True, "message": "已登出"})
+
+
+# ====================== 骑手注册/登录/会话 ======================
+
+@app.route("/rider/register", methods=["POST"])
+def rider_register():
+    """骑手注册：用户名 + 密码 + 设备指纹 + 验证码。"""
+    ensure_schema_migrations()
+    data = request.json or {}
+
+    username = (data.get("username") or "").strip()
+    password = (data.get("password") or "").strip()
+    confirm_password = (data.get("confirm_password") or "").strip()
+    captcha_answer = (data.get("captcha_answer") or "").strip()
+    machine_fp = (data.get("machine_fp") or data.get("device_fingerprint") or "").strip()
+
+    if not username:
+        return jsonify({"success": False, "message": "骑手用户名不能为空"}), 400
+    if not password:
+        return jsonify({"success": False, "message": "密码不能为空"}), 400
+    if len(password) < 6:
+        return jsonify({"success": False, "message": "密码长度不能少于 6 位"}), 400
+    if password != confirm_password:
+        return jsonify({"success": False, "message": "两次密码输入不一致"}), 400
+    if not captcha_answer:
+        return jsonify({"success": False, "message": "验证码不能为空"}), 400
+    if not machine_fp:
+        return jsonify({"success": False, "message": "缺少设备识别信息，请刷新页面后重试"}), 400
+
+    session_captcha = session.get("captcha_answer")
+    if session_captcha is None:
+        return jsonify({"success": False, "message": "验证码已过期，请刷新后重试"}), 400
+    try:
+        if int(captcha_answer) != int(session_captcha):
+            return jsonify({"success": False, "message": "验证码错误"}), 400
+    except ValueError:
+        return jsonify({"success": False, "message": "验证码格式错误"}), 400
+    finally:
+        session.pop("captcha_answer", None)
+
+    existing = query_one("SELECT * FROM riders WHERE username = ?", (username,))
+    if existing:
+        return jsonify({"success": False, "message": "骑手用户名已存在"}), 409
+
+    fp_count = query_one(
+        "SELECT COUNT(*) AS cnt FROM riders WHERE device_fingerprint = ?",
+        (machine_fp,)
+    )
+    if fp_count and fp_count["cnt"] >= 3:
+        return jsonify({
+            "success": False,
+            "message": "该设备注册骑手账号次数过多，已触发机器注册限制"
+        }), 429
+
+    try:
+        salt = secrets.token_hex(16)
+        password_hash = sm3_strhash(salt + password)
+        temp_pid = f"temp_rider_{uuid.uuid4()}"
+        rider_id = execute(
+            """
+            INSERT INTO riders (username, rider_pid, password_hash, salt, device_fingerprint)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (username, temp_pid, password_hash, salt, machine_fp)
+        )
+
+        rider_pid = generate_pid(app.config["MASTER_KEY"], f"rider:{rider_id}")["pid"]
+        execute("UPDATE riders SET rider_pid = ? WHERE id = ?", (rider_pid, rider_id))
+
+        session["rider_id"] = rider_id
+        session["rider_username"] = username
+
+        return jsonify({
+            "success": True,
+            "message": "骑手注册成功",
+            "data": {
+                "rider_id": rider_id,
+                "username": username
+            }
+        }), 201
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/rider/login", methods=["POST"])
+def rider_login():
+    """骑手登录：用户名 + 密码 + 设备指纹。"""
+    ensure_schema_migrations()
+    data = request.json or {}
+
+    username = (data.get("username") or "").strip()
+    password = (data.get("password") or "").strip()
+    machine_fp = (data.get("machine_fp") or data.get("device_fingerprint") or "").strip()
+
+    if not username or not password:
+        return jsonify({"success": False, "message": "骑手用户名和密码不能为空"}), 400
+    if not machine_fp:
+        return jsonify({"success": False, "message": "缺少设备识别信息，请刷新页面后重试"}), 400
+
+    rider = query_one("SELECT * FROM riders WHERE username = ?", (username,))
+    if not rider:
+        return jsonify({"success": False, "message": "骑手用户名或密码错误"}), 401
+
+    computed_hash = sm3_strhash(rider["salt"] + password)
+    if not hmac.compare_digest(computed_hash, rider["password_hash"]):
+        return jsonify({"success": False, "message": "骑手用户名或密码错误"}), 401
+
+    saved_fp = rider["device_fingerprint"] if "device_fingerprint" in rider.keys() else ""
+    if saved_fp:
+        if not hmac.compare_digest(saved_fp, machine_fp):
+            return jsonify({
+                "success": False,
+                "message": "骑手设备识别失败，请使用注册设备登录"
+            }), 403
+    else:
+        execute("UPDATE riders SET device_fingerprint = ? WHERE id = ?", (machine_fp, rider["id"]))
+
+    session["rider_id"] = rider["id"]
+    session["rider_username"] = rider["username"]
+
+    return jsonify({
+        "success": True,
+        "message": "骑手登录成功",
+        "data": {
+            "rider_id": rider["id"],
+            "username": rider["username"]
+        }
+    })
+
+
+@app.route("/rider/session", methods=["GET"])
+def rider_session():
+    """检查当前骑手登录状态；不返回 rider_pid。"""
+    ensure_schema_migrations()
+    rider = get_current_rider()
+    if rider:
+        return jsonify({
+            "success": True,
+            "data": {
+                "logged_in": True,
+                "rider_id": rider["id"],
+                "username": rider["username"]
+            }
+        })
+    return jsonify({
+        "success": True,
+        "data": {
+            "logged_in": False
+        }
+    })
+
+
+@app.route("/rider/logout", methods=["POST"])
+def rider_logout():
+    session.pop("rider_id", None)
+    session.pop("rider_username", None)
+    return jsonify({"success": True, "message": "骑手已登出"})
 
 
 @app.route("/my_orders", methods=["GET"])
@@ -746,6 +969,7 @@ def verify_order_api():
 
 
 @app.route("/get_pending_orders", methods=["GET"])
+@rider_required
 def get_pending_orders():
     """骑手端查看待接订单：只展示订单号和状态，不暴露用户 PID。"""
     try:
@@ -754,7 +978,7 @@ def get_pending_orders():
             """
             SELECT o.order_id, o.status, o.delivery_note, o.created_at
             FROM orders o
-            WHERE o.status = 'created'
+            WHERE o.status = 'created' AND o.rider_id IS NULL
             ORDER BY o.id DESC
             """
         )
@@ -780,6 +1004,7 @@ def get_pending_orders():
 
 
 @app.route("/rider/orders/search", methods=["GET"])
+@rider_required
 def rider_search_orders():
     """骑手端订单搜索：不返回 PID、user_id、username、token、用户备注/标签。
 
@@ -787,15 +1012,16 @@ def rider_search_orders():
     避免骑手把同一用户的多个订单关联起来。
     """
     ensure_schema_migrations()
+    rider_id = session["rider_id"]
     keyword = (request.args.get("keyword") or "").strip()
     status = (request.args.get("status") or "created").strip()
 
     sql = """
-        SELECT order_id, status, delivery_note, created_at
+        SELECT order_id, status, delivery_note, created_at, rider_id
         FROM orders
-        WHERE 1 = 1
+        WHERE ((status = 'created' AND rider_id IS NULL) OR rider_id = ?)
     """
-    params = []
+    params = [rider_id]
 
     if status:
         sql += " AND status = ?"
@@ -827,12 +1053,14 @@ def rider_search_orders():
 
 
 @app.route("/take_order", methods=["POST"])
+@rider_required
 def take_order():
     data = request.json
     if not data or "order_id" not in data:
         return jsonify({"success": False, "message": "order_id is required"}), 400
 
     order_id = data["order_id"]
+    rider_id = session["rider_id"]
 
     try:
         order = get_order_by_order_id(order_id)
@@ -844,10 +1072,15 @@ def take_order():
                 "success": False,
                 "message": f"order cannot be taken, current status: {order['status']}"
             }), 400
+        if "rider_id" in order.keys() and order["rider_id"] is not None:
+            return jsonify({
+                "success": False,
+                "message": "order has already been assigned to another rider"
+            }), 400
 
         execute(
-            "UPDATE orders SET status = ? WHERE order_id = ?",
-            ("taken", order_id)
+            "UPDATE orders SET status = ?, rider_id = ? WHERE order_id = ?",
+            ("taken", rider_id, order_id)
         )
 
         return jsonify({
@@ -869,6 +1102,17 @@ def get_message_history(order_id):
         order = get_order_by_order_id(order_id)
         if not order:
             return jsonify({"success": False, "message": "order not found"}), 404
+        session_user_id = session.get("user_id")
+        session_rider_id = session.get("rider_id")
+        is_owner = session_user_id and int(session_user_id) == int(order["user_id"])
+        is_assigned_rider = (
+            session_rider_id
+            and "rider_id" in order.keys()
+            and order["rider_id"] is not None
+            and int(session_rider_id) == int(order["rider_id"])
+        )
+        if not is_owner and not is_assigned_rider:
+            return jsonify({"success": False, "message": "not allowed to view this order history"}), 403
 
         history = [public_message(msg) for msg in get_message_history_by_order(order_id)]
         return jsonify({
@@ -904,13 +1148,21 @@ def submit_trace_request():
     if not order:
         return jsonify({"success": False, "message": "order not found"}), 404
 
-    # 用户端申请必须是当前登录用户自己的订单；骑手端不需要也不能提交用户身份信息。
+    # 用户端申请必须是当前登录用户自己的订单；骑手端必须是该订单接单骑手。
     if requester_role == "user":
         session_user_id = session.get("user_id")
         if not session_user_id:
             return jsonify({"success": False, "message": "请先登录后再提交溯源申请"}), 401
         if int(session_user_id) != int(order["user_id"]):
             return jsonify({"success": False, "message": "只能为自己的订单提交溯源申请"}), 403
+    if requester_role == "rider":
+        session_rider_id = session.get("rider_id")
+        if not session_rider_id:
+            return jsonify({"success": False, "message": "请先登录骑手账号后再提交溯源申请"}), 401
+        if "rider_id" not in order.keys() or order["rider_id"] is None:
+            return jsonify({"success": False, "message": "该订单尚未分配骑手，不能提交骑手侧溯源申请"}), 403
+        if int(session_rider_id) != int(order["rider_id"]):
+            return jsonify({"success": False, "message": "只能为自己接单的订单提交溯源申请"}), 403
 
     request_id = execute(
         """
@@ -1616,15 +1868,23 @@ def report_merkle_root():
         return jsonify({"success": False, "message": "order_id, merkle_root, role 均为必填"}), 400
     if role not in ("user", "rider"):
         return jsonify({"success": False, "message": "role 必须为 user 或 rider"}), 400
-    if not get_order_by_order_id(order_id):
+    order = get_order_by_order_id(order_id)
+    if not order:
         return jsonify({"success": False, "message": "order not found"}), 404
 
-    # 用户端只能为自己的订单上报 Root；骑手端仍不接触 PID 或用户身份。
+    # 用户端只能为自己的订单上报 Root；骑手端只能为自己接单的订单上报 Root。
     if role == "user":
-        order = get_order_by_order_id(order_id)
         session_user_id = session.get("user_id")
         if not session_user_id or int(session_user_id) != int(order["user_id"]):
             return jsonify({"success": False, "message": "只能为自己的订单上报用户端 Root"}), 403
+    if role == "rider":
+        session_rider_id = session.get("rider_id")
+        if not session_rider_id:
+            return jsonify({"success": False, "message": "请先登录骑手账号后再上报骑手端 Root"}), 401
+        if "rider_id" not in order.keys() or order["rider_id"] is None:
+            return jsonify({"success": False, "message": "该订单尚未分配骑手，不能上报骑手端 Root"}), 403
+        if int(session_rider_id) != int(order["rider_id"]):
+            return jsonify({"success": False, "message": "只能为自己接单的订单上报骑手端 Root"}), 403
 
     try:
         detail = {
@@ -1760,6 +2020,25 @@ def handle_join_order_as_rider(data):
             "message": f"rider cannot join, current order status: {order['status']}"
         })
         return
+    session_rider_id = session.get("rider_id")
+    if not session_rider_id:
+        emit("join_result", {
+            "success": False,
+            "message": "please login as rider first"
+        })
+        return
+    if "rider_id" not in order.keys() or order["rider_id"] is None:
+        emit("join_result", {
+            "success": False,
+            "message": "order has not been assigned to a rider"
+        })
+        return
+    if int(session_rider_id) != int(order["rider_id"]):
+        emit("join_result", {
+            "success": False,
+            "message": "only the assigned rider can join this order room"
+        })
+        return
 
     join_room(order_id)
 
@@ -1823,7 +2102,21 @@ def handle_send_message(data):
             return
         sender_pid = owner["pid"]
     else:
-        sender_pid = "RIDER_DEMO_001"
+        session_rider_id = session.get("rider_id")
+        if not session_rider_id:
+            emit("error_message", {"type": "error", "message": "please login as rider first"})
+            return
+        if "rider_id" not in order.keys() or order["rider_id"] is None:
+            emit("error_message", {"type": "error", "message": "order has not been assigned to a rider"})
+            return
+        if int(session_rider_id) != int(order["rider_id"]):
+            emit("error_message", {"type": "error", "message": "only the assigned rider can send messages"})
+            return
+        rider = get_rider_by_id(session_rider_id)
+        if not rider:
+            emit("error_message", {"type": "error", "message": "rider account not found"})
+            return
+        sender_pid = rider["rider_pid"]
 
     timestamp = now_iso()
     msg_id = str(uuid.uuid4())
@@ -1968,4 +2261,5 @@ def admin_trace_violation():
 if __name__ == "__main__":
     init_db()
     ensure_schema_migrations()
+    warn_default_config()
     socketio.run(app, host="127.0.0.1", port=5000, debug=True, allow_unsafe_werkzeug=True)
