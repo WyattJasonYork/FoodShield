@@ -261,25 +261,27 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-const BASE_URL = window.location.origin;
 const IS_FLASK_LOCAL = ["127.0.0.1", "localhost"].includes(window.location.hostname) && window.location.port === "5000";
+const FLASK_ORIGIN = window.location.hostname === "localhost" ? "http://localhost:5000" : "http://127.0.0.1:5000";
+const BASE_URL = IS_FLASK_LOCAL ? window.location.origin : FLASK_ORIGIN;
 
 const socket = createSafeSocket();
 
 function createSafeSocket() {
     const noopSocket = {
         on: () => {},
-        emit: () => showAlert("warning", "当前不是 Flask 本地页面。请用浏览器打开 http://127.0.0.1:5000/rider.html 后再使用聊天功能。")
+        emit: () => showAlert("warning", "Socket.IO 客户端未加载，请检查网络或改用 http://127.0.0.1:5000/rider.html 打开。")
     };
-    if (!IS_FLASK_LOCAL || typeof io === "undefined") {
-        console.warn("Preview/非 Flask 环境：已禁用 Socket.IO 自动连接，避免网络权限弹窗循环。");
+    if (typeof io === "undefined") {
+        console.warn("Socket.IO client is unavailable.");
         return noopSocket;
     }
-    return io(window.location.origin, {
+    return io(BASE_URL, {
         path: "/socket.io",
         transports: ["polling", "websocket"],
         autoConnect: true,
-        reconnection: false
+        reconnection: false,
+        withCredentials: true
     });
 }
 
@@ -655,10 +657,19 @@ async function handleJoinChat() {
             role: "rider"
         });
 
-        socket.emit("join_order_as_rider", {
-            order_id: orderId,
-            role: "rider"
-        });
+        hasJoinedChatRoom = true;
+        currentOrderId = orderId;
+        enableChatInput(true);
+        updateChatStatus(`已允许发送消息：${orderId}`, "success");
+        if (socket.connected) {
+            socket.emit("join_order_as_rider", {
+                order_id: orderId,
+                role: "rider"
+            });
+        } else {
+            await loadMessageHistory();
+            showAlert("success", "已进入订单通信。Socket 未连接时将使用 HTTP 保存消息。");
+        }
     } catch (error) {
         console.error("handleJoinChat error:", error);
         showAlert("danger", "进入聊天房间失败。");
@@ -689,7 +700,21 @@ async function loadMessageHistory() {
     }
 }
 
-function handleSendMessage() {
+async function sendMessageHttpFallback(order_id, role, content) {
+    const res = await fetch(`${BASE_URL}/send_message`, {
+        method: "POST",
+        credentials: "include",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ order_id, role, content })
+    });
+    const result = await res.json();
+    if (!result.success) {
+        throw new Error(result.message || "消息保存失败。");
+    }
+    return result.data;
+}
+
+async function handleSendMessage() {
     if (!hasJoinedChatRoom) {
         showAlert("warning", "请先进入聊天房间。");
         return;
@@ -713,13 +738,14 @@ function handleSendMessage() {
         return;
     }
 
-    socket.emit("send_message", {
-        order_id: orderId,
-        role: "rider",
-        content
-    });
-
     contentInput.value = "";
+    try {
+        const msg = await sendMessageHttpFallback(orderId, "rider", content);
+        appendMessage(msg);
+    } catch (e) {
+        contentInput.value = content;
+        showAlert("danger", e.message || "聊天消息发送失败。");
+    }
 }
 
 async function submitRiderTraceRequest() {
@@ -843,6 +869,15 @@ socket.on("receive_message", (msg) => {
         localStorage.setItem("merkle_root_" + currentOrderId, currentMerkleRoot);
         updateRiderMerkleRootBox(currentMerkleRoot);
         reportMerkleRoot(currentOrderId, currentMerkleRoot, "rider");
+    }
+});
+
+socket.on("message_saved", (res) => {
+    if (res && res.success && res.data && res.data.merkle_root) {
+        currentMerkleRoot = res.data.merkle_root;
+        currentOrderId = res.data.order_id || currentOrderId;
+        localStorage.setItem("merkle_root_" + currentOrderId, currentMerkleRoot);
+        updateRiderMerkleRootBox(currentMerkleRoot);
     }
 });
 

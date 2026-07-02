@@ -201,8 +201,9 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-const BASE_URL = window.location.origin;
 const IS_FLASK_LOCAL = ["127.0.0.1", "localhost"].includes(window.location.hostname) && window.location.port === "5000";
+const FLASK_ORIGIN = window.location.hostname === "localhost" ? "http://localhost:5000" : "http://127.0.0.1:5000";
+const BASE_URL = IS_FLASK_LOCAL ? window.location.origin : FLASK_ORIGIN;
 const socket = createSafeSocket();
 
 let currentUser = null;
@@ -213,17 +214,18 @@ let currentOrderId = "";
 function createSafeSocket() {
     const noopSocket = {
         on: () => {},
-        emit: () => showAlert("warning", "当前不是 Flask 本地页面。请用浏览器打开 http://127.0.0.1:5000/user.html 后再使用聊天功能。")
+        emit: () => showAlert("warning", "Socket.IO 客户端未加载，请检查网络或改用 http://127.0.0.1:5000/user.html 打开。")
     };
-    if (!IS_FLASK_LOCAL || typeof io === "undefined") {
-        console.warn("Preview/非 Flask 环境：已禁用 Socket.IO 自动连接，避免网络权限弹窗循环。")
+    if (typeof io === "undefined") {
+        console.warn("Socket.IO client is unavailable.");
         return noopSocket;
     }
-    return io(window.location.origin, {
+    return io(BASE_URL, {
         path: "/socket.io",
         transports: ["polling", "websocket"],
         autoConnect: true,
-        reconnection: false
+        reconnection: false,
+        withCredentials: true
     });
 }
 
@@ -629,7 +631,16 @@ async function handleJoinChat() {
             updateChatStatus("订单认证失败，无法进入聊天房间。", "danger");
             return showAlert("danger", "订单认证失败，无法进入聊天房间。");
         }
-        socket.emit("join_order", { order_id, timestamp, token, role: "user" });
+        hasJoinedChatRoom = true;
+        currentOrderId = order_id;
+        enableChatInput(true);
+        updateChatStatus(`订单认证通过，已允许发送消息：${order_id}`, "success");
+        if (socket.connected) {
+            socket.emit("join_order", { order_id, timestamp, token, role: "user" });
+        } else {
+            await loadMessageHistory();
+            showAlert("success", "订单认证通过。Socket 未连接时将使用 HTTP 保存消息。");
+        }
     } catch (error) {
         showAlert("danger", "进入聊天房间失败，请检查后端是否启动。");
     } finally {
@@ -637,15 +648,38 @@ async function handleJoinChat() {
     }
 }
 
-function handleSendMessage() {
+async function sendMessageHttpFallback(order_id, role, content) {
+    const res = await fetch(`${BASE_URL}/send_message`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        credentials: "include",
+        body: JSON.stringify({ order_id, role, content })
+    });
+    const result = await res.json();
+    if (!result.success) {
+        throw new Error(result.message || "消息保存失败。");
+    }
+    return result.data;
+}
+
+async function handleSendMessage() {
     if (!hasJoinedChatRoom) return showAlert("warning", "请先进入聊天房间。");
+
     const order_id = document.getElementById("verifyOrderId").value.trim();
     const contentInput = document.getElementById("chatInput");
     const content = contentInput.value.trim();
+
     if (!order_id) return showAlert("warning", "订单信息不完整。");
     if (!content) return showAlert("warning", "请输入消息内容。");
-    socket.emit("send_message", { order_id, role: "user", content });
+
     contentInput.value = "";
+    try {
+        const msg = await sendMessageHttpFallback(order_id, "user", content);
+        appendMessage(msg);
+    } catch (e) {
+        contentInput.value = content;
+        showAlert("danger", e.message || "聊天消息发送失败。");
+    }
 }
 
 async function submitUserTraceRequest() {
@@ -717,6 +751,7 @@ async function manualReportUserRoot() {
 socket.on("connect", () => updateChatStatus("WebSocket 已连接，可进入聊天房间。", "secondary"));
 socket.on("disconnect", () => { hasJoinedChatRoom = false; enableChatInput(false); updateChatStatus("连接已断开。", "danger"); });
 socket.on("join_result", async (res) => {
+    console.log("🔥 JOIN_RESULT:", res); 
     if (res.success) {
         hasJoinedChatRoom = true;
         currentOrderId = res.order_id;
@@ -746,6 +781,14 @@ socket.on("receive_message", msg => {
         localStorage.setItem("merkle_root_" + currentOrderId, currentMerkleRoot);
         updateUserMerkleRootBox(currentMerkleRoot);
         reportMerkleRoot(currentOrderId, currentMerkleRoot, "user");
+    }
+});
+socket.on("message_saved", res => {
+    if (res && res.success && res.data && res.data.merkle_root) {
+        currentMerkleRoot = res.data.merkle_root;
+        currentOrderId = res.data.order_id || currentOrderId;
+        localStorage.setItem("merkle_root_" + currentOrderId, currentMerkleRoot);
+        updateUserMerkleRootBox(currentMerkleRoot);
     }
 });
 socket.on("error_message", msg => showAlert("danger", msg.message || "聊天消息发送失败。"));

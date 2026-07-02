@@ -32,15 +32,30 @@ app.config["ADMIN_PASSWORD"] = os.getenv("FOODSHIELD_ADMIN_PASSWORD", DEFAULT_AD
 app.config["ORDER_ALIAS_SECRET"] = os.getenv("FOODSHIELD_ORDER_ALIAS_SECRET", DEFAULT_ORDER_ALIAS_SECRET)
 app.config["MASTER_KEY"] = os.getenv("FOODSHIELD_MASTER_KEY", DEFAULT_MASTER_KEY)
 
-CORS(app)
+CORS(app, supports_credentials=True)
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
     async_mode="threading",
-    manage_session=False,
+    manage_session=True,
     logger=os.getenv("FOODSHIELD_SOCKETIO_DEBUG", "0") == "1",
     engineio_logger=os.getenv("FOODSHIELD_SOCKETIO_DEBUG", "0") == "1"
 )
+
+
+class ChatMessageError(Exception):
+    def __init__(self, message: str, status_code: int = 400):
+        super().__init__(message)
+        self.message = message
+        self.status_code = status_code
+
+
+def socket_debug(event: str, **fields):
+    if os.getenv("FOODSHIELD_SOCKET_DEBUG_PRINT", "1") != "1":
+        return
+    detail = " ".join(f"{key}={value!r}" for key, value in fields.items())
+    print(f"[socket] {event} {detail}", flush=True)
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 FRONTEND_DIR = BASE_DIR / "project" / "frontend"
@@ -319,6 +334,77 @@ def save_message(msg_id, order_id, sender_pid, role, content, message_hash, time
         """,
         (msg_id, order_id, sender_pid, role, encrypted_content, message_hash, timestamp)
     )
+
+
+def build_and_save_chat_message(order_id: str, role: str, content: str) -> dict:
+    order_id = str(order_id or "").strip()
+    role = str(role or "").strip()
+    content = str(content or "").strip()
+
+    if not order_id:
+        raise ChatMessageError("order_id is required", 400)
+    if role not in ("user", "rider"):
+        raise ChatMessageError("invalid role", 400)
+    if not content:
+        raise ChatMessageError("content cannot be empty", 400)
+
+    order = get_order_by_order_id(order_id)
+    if not order:
+        raise ChatMessageError("order not found", 404)
+
+    owner = get_user_by_id(order["user_id"])
+    if role == "user":
+        if not owner:
+            raise ChatMessageError("order owner not found", 404)
+        session_user_id = session.get("user_id")
+        if not session_user_id or int(session_user_id) != int(order["user_id"]):
+            raise ChatMessageError("please login as the order owner first", 401)
+        sender_pid = owner["pid"]
+    else:
+        session_rider_id = session.get("rider_id")
+        if not session_rider_id:
+            raise ChatMessageError("please login as rider first", 401)
+        if "rider_id" not in order.keys() or order["rider_id"] is None:
+            raise ChatMessageError("order has not been assigned to a rider", 403)
+        if int(session_rider_id) != int(order["rider_id"]):
+            raise ChatMessageError("only the assigned rider can send messages", 403)
+        rider = get_rider_by_id(session_rider_id)
+        if not rider:
+            raise ChatMessageError("rider account not found", 404)
+        sender_pid = rider["rider_pid"]
+
+    timestamp = now_iso()
+    msg_id = str(uuid.uuid4())
+    message_hash = hash_message(
+        order_id=order_id,
+        sender_pid=sender_pid,
+        role=role,
+        content=content,
+        timestamp=timestamp
+    )
+    msg = {
+        "type": "chat",
+        "msg_id": msg_id,
+        "order_id": order_id,
+        "sender_pid": sender_pid,
+        "role": role,
+        "content": content,
+        "message_hash": message_hash,
+        "timestamp": timestamp
+    }
+
+    save_message(
+        msg["msg_id"],
+        msg["order_id"],
+        msg["sender_pid"],
+        msg["role"],
+        msg["content"],
+        msg["message_hash"],
+        msg["timestamp"]
+    )
+    snapshot = create_merkle_snapshot(order_id)
+    msg["merkle_root"] = snapshot["merkle_root"]
+    return msg
 
 
 def get_message_history_by_order(order_id: str):
@@ -1125,6 +1211,34 @@ def get_message_history(order_id):
         return jsonify({"success": False, "message": str(e)}), 500
 
 
+@app.route("/send_message", methods=["POST"])
+def send_message_api():
+    """HTTP fallback for chat messages.
+
+    Socket.IO remains the realtime path, but this route writes through the same
+    validation and persistence logic so browser/socket quirks cannot silently
+    drop messages during demos.
+    """
+    data = request.json or {}
+    try:
+        msg = build_and_save_chat_message(
+            data.get("order_id"),
+            data.get("role"),
+            data.get("content")
+        )
+        socketio.emit("receive_message", public_message(msg), room=msg["order_id"])
+        return jsonify({
+            "success": True,
+            "message": "message saved successfully",
+            "data": public_message(msg)
+        }), 201
+    except ChatMessageError as e:
+        return jsonify({"success": False, "message": e.message}), e.status_code
+    except Exception as e:
+        print(f"[send_message_api] error: {e}", flush=True)
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
 
 # ====================== 条件溯源申请 API ======================
 
@@ -1910,11 +2024,21 @@ def report_merkle_root():
 
 @socketio.on("connect")
 def handle_connect():
+    socket_debug(
+        "connect",
+        user_id=session.get("user_id"),
+        rider_id=session.get("rider_id")
+    )
     pass  # 静默连接，不发送系统消息到聊天界面
 
 
 @socketio.on("join_order")
 def handle_join_order(data):
+    socket_debug(
+        "join_order",
+        data=data,
+        session_user_id=session.get("user_id")
+    )
     """
     用户侧进入订单聊天房间。
     隐私修复：前端不再提交 PID，后端根据 session 与订单归属关系取 PID 校验 Token。
@@ -2062,102 +2186,27 @@ def handle_send_message(data):
     发送消息。
     修复：用户消息的 sender_pid 由订单归属用户确定，不能完全相信前端提交值；广播给普通端时不暴露 PID。
     """
-    required = ["order_id", "role", "content"]
-    for field in required:
-        if not data or field not in data:
-            emit("error_message", {
-                "type": "error",
-                "message": f"{field} is required"
-            })
-            return
-
-    order_id = data["order_id"]
-    role = data["role"]
-    content = str(data["content"]).strip()
-
-    if role not in ("user", "rider"):
-        emit("error_message", {"type": "error", "message": "invalid role"})
-        return
-
-    if not content:
-        emit("error_message", {
-            "type": "error",
-            "message": "content cannot be empty"
-        })
-        return
-
-    order = get_order_by_order_id(order_id)
-    if not order:
-        emit("error_message", {"type": "error", "message": "order not found"})
-        return
-
-    owner = get_user_by_id(order["user_id"])
-    if role == "user":
-        if not owner:
-            emit("error_message", {"type": "error", "message": "order owner not found"})
-            return
-        session_user_id = session.get("user_id")
-        if not session_user_id or int(session_user_id) != int(order["user_id"]):
-            emit("error_message", {"type": "error", "message": "please login as the order owner first"})
-            return
-        sender_pid = owner["pid"]
-    else:
-        session_rider_id = session.get("rider_id")
-        if not session_rider_id:
-            emit("error_message", {"type": "error", "message": "please login as rider first"})
-            return
-        if "rider_id" not in order.keys() or order["rider_id"] is None:
-            emit("error_message", {"type": "error", "message": "order has not been assigned to a rider"})
-            return
-        if int(session_rider_id) != int(order["rider_id"]):
-            emit("error_message", {"type": "error", "message": "only the assigned rider can send messages"})
-            return
-        rider = get_rider_by_id(session_rider_id)
-        if not rider:
-            emit("error_message", {"type": "error", "message": "rider account not found"})
-            return
-        sender_pid = rider["rider_pid"]
-
-    timestamp = now_iso()
-    msg_id = str(uuid.uuid4())
-
-    message_hash = hash_message(
-        order_id=order_id,
-        sender_pid=sender_pid,
-        role=role,
-        content=content,
-        timestamp=timestamp
+    socket_debug(
+        "send_message",
+        user_id=session.get("user_id"),
+        rider_id=session.get("rider_id")
     )
 
-    msg = {
-        "type": "chat",
-        "msg_id": msg_id,
-        "order_id": order_id,
-        "sender_pid": sender_pid,
-        "role": role,
-        "content": content,
-        "message_hash": message_hash,
-        "timestamp": timestamp
-    }
-
     try:
-        save_message(
-            msg["msg_id"],
-            msg["order_id"],
-            msg["sender_pid"],
-            msg["role"],
-            msg["content"],
-            msg["message_hash"],
-            msg["timestamp"]
+        msg = build_and_save_chat_message(
+            data.get("order_id") if data else None,
+            data.get("role") if data else None,
+            data.get("content") if data else None
         )
-
-        snapshot = create_merkle_snapshot(order_id)
-        msg["merkle_root"] = snapshot["merkle_root"]
-
-        emit("receive_message", public_message(msg), room=order_id)
-
+        emit("message_saved", {"success": True, "data": public_message(msg)})
+        emit("receive_message", public_message(msg), room=msg["order_id"])
+    except ChatMessageError as e:
+        emit("error_message", {
+            "type": "error",
+            "message": e.message
+        })
     except Exception as e:
-        print(f"[send_message] error: {e}")
+        print(f"[send_message] error: {e}", flush=True)
         emit("error_message", {
             "type": "error",
             "message": str(e)
@@ -2262,4 +2311,4 @@ if __name__ == "__main__":
     init_db()
     ensure_schema_migrations()
     warn_default_config()
-    socketio.run(app, host="127.0.0.1", port=5000, debug=True, allow_unsafe_werkzeug=True)
+    socketio.run(app, host="127.0.0.1", port=5000, debug=True, use_reloader=False, allow_unsafe_werkzeug=True)
