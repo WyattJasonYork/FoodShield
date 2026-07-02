@@ -1,7 +1,17 @@
+import os
 import time
 from project.crypto.auth_utils import HMACAuth
 
-K_ORDER = "FoodShield"
+DEFAULT_ORDER_KEY = "FoodShield"
+
+
+def get_order_key() -> str:
+    """
+    订单 Token 的 HMAC-SM3 密钥。
+
+    竞赛演示可使用默认值，但正式部署必须通过环境变量覆盖。
+    """
+    return os.getenv("FOODSHIELD_ORDER_KEY", DEFAULT_ORDER_KEY)
 
 def generate_token(order_id: str, pid: str) -> dict:
     """
@@ -11,7 +21,7 @@ def generate_token(order_id: str, pid: str) -> dict:
     timestamp = str(int(time.time()))
     message = f"{order_id}|{pid}|{timestamp}"
 
-    token = HMACAuth.sign(K_ORDER, message)
+    token = HMACAuth.sign(get_order_key(), message)
     return {
         "token": token,
         "timestamp": timestamp
@@ -28,7 +38,7 @@ def verify_token(order_id: str, pid: str, timestamp: str, provided_token: str, e
         return False
 
     message = f"{order_id}|{pid}|{timestamp}"
-    return HMACAuth.verify(K_ORDER, message, provided_token)
+    return HMACAuth.verify(get_order_key(), message, provided_token)
 
 
 if __name__ == "__main__":

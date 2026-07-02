@@ -1,7 +1,7 @@
 """
 国密算法工具模块 (SM2/SM3/SM4)
-- SM3 哈希: 替代 SHA-256
-- HMAC-SM3: 替代 HMAC-SHA256
+- SM3 哈希
+- HMAC-SM3
 - SM4-CBC 加解密: 消息内容加密存储
 
 依赖: gmssl
