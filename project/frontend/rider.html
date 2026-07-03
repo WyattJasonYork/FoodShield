@@ -3,95 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>骑手端 - 匿名外卖</title>
+    <title>骑手端 - FoodShield</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="/css/style.css" rel="stylesheet">
-    <style>
-        body {
-            background: #f5f7fb;
-        }
-        .navbar {
-            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-        }
-        .page-title {
-            font-weight: 700;
-            letter-spacing: 1px;
-        }
-        .step-card {
-            border: none;
-            border-radius: 18px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.06);
-            height: 100%;
-        }
-        .step-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-        }
-        .result-box {
-            background: #f8f9fa;
-            border: 1px solid #e9ecef;
-            border-radius: 12px;
-            padding: 12px;
-            min-height: 56px;
-            word-break: break-all;
-        }
-        .section-tip {
-            font-size: 0.92rem;
-            color: #6c757d;
-        }
-        .order-card {
-            border: 1px solid #e9ecef;
-            border-radius: 14px;
-            background: #fff;
-            padding: 14px;
-            margin-bottom: 12px;
-        }
-        .order-meta {
-            font-size: 0.92rem;
-            color: #6c757d;
-        }
-        .chat-message {
-            border-radius: 12px;
-            padding: 10px 12px;
-            margin-bottom: 10px;
-            border: 1px solid #e9ecef;
-            background: #fff;
-        }
-        .chat-message.user {
-            border-left: 4px solid #0d6efd;
-        }
-        .chat-message.rider {
-            border-left: 4px solid #198754;
-        }
-        .chat-message.system {
-            background: #f8f9fa;
-            border-left: 4px solid #6c757d;
-        }
-        .chat-meta {
-            font-size: 0.85rem;
-            color: #6c757d;
-            margin-bottom: 4px;
-        }
-        .chat-content {
-            color: #212529;
-            white-space: pre-wrap;
-            word-break: break-word;
-        }
-        #chatMessages {
-            min-height: 260px;
-            max-height: 420px;
-            overflow-y: auto;
-            background: #ffffff;
-        }
-        .badge-status {
-            font-size: 0.92rem;
-            padding: 0.45em 0.75em;
-        }
-    </style>
     <link href="/css/style.css?v=showcase" rel="stylesheet">
 </head>
 <body>
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+<nav class="navbar navbar-expand-lg navbar-dark">
     <div class="container">
         <a class="navbar-brand fw-bold" href="/">FoodShield</a>
         <div class="navbar-nav ms-auto">
@@ -117,21 +34,21 @@
 
     <div id="alertBox"></div>
 
-    <div class="card step-card p-4 mb-4">
-        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+    <div class="card step-card p-5 mb-5">
+        <div class="d-flex justify-content-between align-items-start gap-4 flex-wrap">
             <div>
                 <div class="step-title text-dark mb-2">0. 骑手登录 / 注册</div>
                 <div class="section-tip" id="riderLoginStatus">正在检查骑手登录状态...</div>
             </div>
             <div id="riderLoggedInBox" style="display:none;">
-                <span class="badge text-bg-success me-2">已登录：<span id="currentRiderName"></span></span>
+                <span class="badge bg-success text-white me-2">已登录：<span id="currentRiderName"></span></span>
                 <button class="btn btn-sm btn-outline-secondary" onclick="handleRiderLogout()">退出登录</button>
             </div>
         </div>
 
-        <div class="row g-3 mt-2" id="riderAuthForms">
+        <div class="row g-4 mt-4" id="riderAuthForms">
             <div class="col-lg-5">
-                <div class="fw-semibold mb-2">骑手登录</div>
+                <div class="fw-semibold mb-3">骑手登录</div>
                 <div class="input-group">
                     <input id="riderLoginUsername" type="text" class="form-control" placeholder="骑手用户名">
                     <input id="riderLoginPassword" type="password" class="form-control" placeholder="密码">
@@ -139,8 +56,8 @@
                 </div>
             </div>
             <div class="col-lg-7">
-                <div class="fw-semibold mb-2">骑手注册</div>
-                <div class="input-group mb-2">
+                <div class="fw-semibold mb-3">骑手注册</div>
+                <div class="input-group mb-3">
                     <input id="riderRegUsername" type="text" class="form-control" placeholder="新骑手用户名">
                     <input id="riderRegPassword" type="password" class="form-control" placeholder="密码">
                     <input id="riderRegConfirmPassword" type="password" class="form-control" placeholder="确认密码">
@@ -150,7 +67,7 @@
                     <button id="riderCaptchaBtn" class="btn btn-outline-secondary" type="button" onclick="refreshRiderCaptcha()">获取验证码</button>
                     <button id="riderRegisterBtn" class="btn btn-success" onclick="handleRiderRegister()">注册并登录</button>
                 </div>
-                <div id="riderCaptchaQuestion" class="section-tip mt-2" style="display:none;"></div>
+                <div id="riderCaptchaQuestion" class="section-tip mt-3" style="display:none;"></div>
             </div>
         </div>
     </div>
@@ -201,7 +118,7 @@
                     <div class="col-md-4">
                         <label class="form-label">订单状态</label>
                         <div>
-                            <span id="currentOrderStatus" class="badge text-bg-secondary badge-status">未接单</span>
+                            <span id="currentOrderStatus" class="badge text-bg-secondary">未接单</span>
                         </div>
                     </div>
                 </div>
@@ -213,7 +130,7 @@
 
                 <div class="mt-3">
                     <label class="form-label">骑手端 Merkle Root</label>
-                    <div id="riderMerkleRootBox" class="result-box">尚未同步消息 Root</div>
+                    <div id="riderMerkleRootBox" class="result-box merkle-root">尚未同步消息 Root</div>
                     <div class="d-flex gap-2 flex-wrap mt-2">
                         <button class="btn btn-sm btn-outline-primary" onclick="manualReportRiderRoot()">上报骑手端 Root</button>
                         <span class="section-tip align-self-center">用于管理员端“三端一致性验证”。</span>
@@ -231,7 +148,7 @@
 
                 <div class="mt-3">
                     <label class="form-label">聊天记录</label>
-                    <div id="chatMessages" class="result-box"></div>
+                    <div id="chatMessages"></div>
                 </div>
 
                 <div class="mt-3">
@@ -245,7 +162,7 @@
                 </div>
 
                 <div class="section-tip mt-2">
-                    当前阶段骑手端采用平台接单后入房的最小实现，用于完成第三周双向通信联调。
+                    当前阶段骑手端采用平台接单后入房的最小实现，用于完成双向通信联调。
                 </div>
 
                 <hr>
@@ -265,7 +182,7 @@ const IS_FLASK_LOCAL = ["127.0.0.1", "localhost"].includes(window.location.hostn
 const FLASK_ORIGIN = window.location.hostname === "localhost" ? "http://localhost:5000" : "http://127.0.0.1:5000";
 const BASE_URL = IS_FLASK_LOCAL ? window.location.origin : FLASK_ORIGIN;
 
-const socket = createSafeSocket();
+let socket = null;
 
 function createSafeSocket() {
     const noopSocket = {
@@ -279,10 +196,88 @@ function createSafeSocket() {
     return io(BASE_URL, {
         path: "/socket.io",
         transports: ["polling", "websocket"],
-        autoConnect: true,
+        autoConnect: false,
         reconnection: false,
         withCredentials: true
     });
+}
+
+function initSocketListeners() {
+    if (!socket) return;
+    socket.on("connect", () => updateChatStatus("WebSocket 已连接，可进入聊天房间。", "secondary"));
+    socket.on("disconnect", () => { hasJoinedChatRoom = false; enableChatInput(false); updateChatStatus("连接已断开。", "danger"); });
+    socket.on("join_result", async (res) => {
+        if (res.success) {
+            hasJoinedChatRoom = true;
+            currentOrderId = res.order_id;
+            enableChatInput(true);
+            updateChatStatus(`已进入订单房间：${res.order_id}`, "success");
+            showAlert("success", res.message || "进入聊天房间成功。");
+            const savedRoot = localStorage.getItem("merkle_root_" + res.order_id);
+            if (savedRoot) {
+                currentMerkleRoot = savedRoot;
+                updateRiderMerkleRootBox(savedRoot);
+                reportMerkleRoot(res.order_id, savedRoot, "rider");
+            }
+            await loadMessageHistory();
+        } else {
+            hasJoinedChatRoom = false;
+            enableChatInput(false);
+            const errorMsg = res.message || "进入聊天房间失败。";
+            updateChatStatus(errorMsg, "danger");
+            if (errorMsg.includes("please login as rider first")) {
+                showAlert("danger", "会话验证失败：请刷新页面后重新登录骑手账号，然后再次尝试进入聊天房间。");
+            } else {
+                showAlert("danger", errorMsg);
+            }
+        }
+    });
+    socket.on("system_message", (msg) => {
+        appendMessage({
+            type: "system",
+            message: msg.message,
+            timestamp: msg.timestamp
+        });
+    });
+    socket.on("receive_message", (msg) => {
+        appendMessage(msg);
+        if (msg.merkle_root) {
+            currentMerkleRoot = msg.merkle_root;
+            currentOrderId = msg.order_id || currentOrderId;
+            localStorage.setItem("merkle_root_" + currentOrderId, currentMerkleRoot);
+            updateRiderMerkleRootBox(currentMerkleRoot);
+            reportMerkleRoot(currentOrderId, currentMerkleRoot, "rider");
+        }
+    });
+    socket.on("message_saved", (res) => {
+        if (res && res.success && res.data && res.data.merkle_root) {
+            currentMerkleRoot = res.data.merkle_root;
+            currentOrderId = res.data.order_id || currentOrderId;
+            localStorage.setItem("merkle_root_" + currentOrderId, currentMerkleRoot);
+            updateRiderMerkleRootBox(currentMerkleRoot);
+        }
+    });
+    socket.on("error_message", (msg) => {
+        showAlert("danger", msg.message || "聊天消息发送失败。");
+    });
+}
+
+function connectSocketAfterLogin() {
+    if (socket && socket.connected) {
+        updateChatStatus("WebSocket 已连接。", "secondary");
+        return;
+    }
+    if (!socket) {
+        socket = createSafeSocket();
+        initSocketListeners();
+    }
+    socket.connect();
+}
+
+function disconnectSocket() {
+    if (socket) {
+        socket.disconnect();
+    }
 }
 
 let hasJoinedChatRoom = false;
@@ -342,6 +337,12 @@ function updateRiderAuthUI() {
     document.getElementById("refreshOrdersBtn").disabled = !loggedIn;
     document.getElementById("joinChatBtn").disabled = true;
     enableChatInput(false);
+    
+    if (loggedIn) {
+        connectSocketAfterLogin();
+    } else {
+        disconnectSocket();
+    }
 }
 
 async function checkRiderSession() {
@@ -465,9 +466,9 @@ function updateCurrentOrder(orderId, status) {
     document.getElementById("currentOrderId").value = orderId || "";
     const badge = document.getElementById("currentOrderStatus");
     badge.innerText = status || "未知";
-    badge.className = "badge badge-status";
+    badge.className = "badge";
     if (status === "taken" || status === "delivering" || status === "completed") {
-        badge.classList.add("text-bg-success");
+        badge.classList.add("badge-success");
     } else {
         badge.classList.add("text-bg-secondary");
     }
@@ -575,7 +576,7 @@ async function loadPendingOrders() {
                         接单并准备进入聊天
                     </button>
                 ` : `
-                    <button class="btn btn-outline-primary btn-sm" onclick="selectRiderOrder('${escapeHtml(order.order_id)}', '${escapeHtml(order.status || "") }')">
+                    <button class="btn btn-outline-primary btn-sm" onclick="selectRiderOrder('${escapeHtml(order.order_id)}', '${escapeHtml(order.status || "")}')">
                         选择该订单
                     </button>
                 `}
@@ -652,11 +653,6 @@ async function handleJoinChat() {
     setButtonLoading("joinChatBtn", "进入中...", true);
 
     try {
-        console.log("join_order_as_rider payload:", {
-            order_id: orderId,
-            role: "rider"
-        });
-
         hasJoinedChatRoom = true;
         currentOrderId = orderId;
         enableChatInput(true);
@@ -740,8 +736,7 @@ async function handleSendMessage() {
 
     contentInput.value = "";
     try {
-        const msg = await sendMessageHttpFallback(orderId, "rider", content);
-        appendMessage(msg);
+        await sendMessageHttpFallback(orderId, "rider", content);
     } catch (e) {
         contentInput.value = content;
         showAlert("danger", e.message || "聊天消息发送失败。");
@@ -766,7 +761,7 @@ async function submitRiderTraceRequest() {
         const result = await res.json();
         if (result.success) {
             document.getElementById("riderTraceRequestResult").innerHTML = `已提交，申请编号：${escapeHtml(result.data.request_id)}，等待管理员审批。`;
-            showAlert("success", "溯源申请已提交。骑手端只提交订单号和原因，不提交 PID。 ");
+            showAlert("success", "溯源申请已提交。骑手端只提交订单号和原因，不提交 PID。");
         } else {
             showAlert("danger", result.message || "提交溯源申请失败。");
         }
@@ -803,87 +798,16 @@ async function reportMerkleRoot(orderId, merkleRoot, role) {
 async function manualReportRiderRoot() {
     const orderId = currentOrderId || document.getElementById("currentOrderId").value.trim();
     const root = currentMerkleRoot || (orderId ? localStorage.getItem("merkle_root_" + orderId) : null);
-    if (!orderId) return showAlert("warning", "请先选择或接单一个订单。 ");
-    if (!root) return showAlert("warning", "当前骑手端还没有可上报的 Merkle Root。请先进入聊天并发送/接收一条消息。 ");
+    if (!orderId) return showAlert("warning", "请先选择或接单一个订单。");
+    if (!root) return showAlert("warning", "当前骑手端还没有可上报的 Merkle Root。请先进入聊天并发送/接收一条消息。");
     const result = await reportMerkleRoot(orderId, root, "rider");
     if (result.success) {
         updateRiderMerkleRootBox(root);
-        showAlert("success", "骑手端 Merkle Root 已上报，管理员端可进行三端一致性验证。 ");
+        showAlert("success", "骑手端 Merkle Root 已上报，管理员端可进行三端一致性验证。");
     } else {
-        showAlert("danger", result.message || "骑手端 Root 上报失败。 ");
+        showAlert("danger", result.message || "骑手端 Root 上报失败。");
     }
 }
-
-socket.on("connect", () => {
-    console.log("Socket connected, id =", socket.id);
-    updateChatStatus("Socket 已连接，可接单后入房。", "secondary");
-});
-
-socket.on("connect_error", (err) => {
-    console.error("socket connect_error:", err);
-    updateChatStatus("Socket 连接失败，请查看控制台。", "danger");
-});
-
-socket.on("disconnect", (reason) => {
-    console.log("socket disconnected:", reason);
-    hasJoinedChatRoom = false;
-    enableChatInput(false);
-    updateChatStatus("连接已断开。", "danger");
-});
-
-socket.on("join_result", async (res) => {
-    if (res.success) {
-        hasJoinedChatRoom = true;
-        currentOrderId = res.order_id;
-        enableChatInput(true);
-        updateChatStatus(`已进入订单房间：${res.order_id}`, "success");
-        showAlert("success", res.message || "进入聊天房间成功。");
-        const savedRoot = localStorage.getItem("merkle_root_" + res.order_id);
-        if (savedRoot) {
-            currentMerkleRoot = savedRoot;
-            updateRiderMerkleRootBox(savedRoot);
-            reportMerkleRoot(res.order_id, savedRoot, "rider");
-        }
-        await loadMessageHistory();
-    } else {
-        hasJoinedChatRoom = false;
-        enableChatInput(false);
-        updateChatStatus(res.message || "进入聊天房间失败。", "danger");
-        showAlert("danger", res.message || "进入聊天房间失败。");
-    }
-});
-
-socket.on("system_message", (msg) => {
-    appendMessage({
-        type: "system",
-        message: msg.message,
-        timestamp: msg.timestamp
-    });
-});
-
-socket.on("receive_message", (msg) => {
-    appendMessage(msg);
-    if (msg.merkle_root) {
-        currentMerkleRoot = msg.merkle_root;
-        currentOrderId = msg.order_id || currentOrderId;
-        localStorage.setItem("merkle_root_" + currentOrderId, currentMerkleRoot);
-        updateRiderMerkleRootBox(currentMerkleRoot);
-        reportMerkleRoot(currentOrderId, currentMerkleRoot, "rider");
-    }
-});
-
-socket.on("message_saved", (res) => {
-    if (res && res.success && res.data && res.data.merkle_root) {
-        currentMerkleRoot = res.data.merkle_root;
-        currentOrderId = res.data.order_id || currentOrderId;
-        localStorage.setItem("merkle_root_" + currentOrderId, currentMerkleRoot);
-        updateRiderMerkleRootBox(currentMerkleRoot);
-    }
-});
-
-socket.on("error_message", (msg) => {
-    showAlert("danger", msg.message || "聊天消息发送失败。");
-});
 
 window.onload = () => {
     enableChatInput(false);
