@@ -4,6 +4,7 @@ from flask_socketio import SocketIO, emit, join_room
 from pathlib import Path
 from datetime import datetime
 from functools import wraps
+import sys
 import uuid
 import json
 import os
@@ -57,8 +58,13 @@ def socket_debug(event: str, **fields):
     print(f"[socket] {event} {detail}", flush=True)
 
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-FRONTEND_DIR = BASE_DIR / "project" / "frontend"
+def _get_frontend_dir():
+    if getattr(sys, "frozen", False):
+        return Path(sys._MEIPASS) / "project" / "frontend"
+    return Path(__file__).resolve().parent.parent.parent / "project" / "frontend"
+
+
+FRONTEND_DIR = _get_frontend_dir()
 
 
 def warn_default_config():
