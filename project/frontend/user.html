@@ -5,40 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>用户端 - FoodShield</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="/css/style.css" rel="stylesheet">
-    <style>
-        body { background: #f5f7fb; }
-        .navbar { box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
-        .page-title { font-weight: 700; letter-spacing: 1px; }
-        .step-card { border: none; border-radius: 18px; box-shadow: 0 8px 24px rgba(0,0,0,0.06); height: 100%; }
-        .step-title { font-size: 1.45rem; font-weight: 700; }
-        .result-box { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 12px; padding: 12px; min-height: 54px; word-break: break-all; }
-        .kv-row { padding: 10px 0; border-bottom: 1px dashed #dee2e6; }
-        .kv-row:last-child { border-bottom: none; }
-        .kv-key { font-weight: 600; color: #495057; margin-bottom: 4px; }
-        .section-tip { font-size: 0.92rem; color: #6c757d; }
-        .badge-status { font-size: 0.95rem; padding: 0.5em 0.8em; }
-        .verify-pass { color: #198754; font-weight: 700; }
-        .verify-fail { color: #dc3545; font-weight: 700; }
-        .chat-message { border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; border: 1px solid #e9ecef; background: #fff; }
-        .chat-message.user { border-left: 4px solid #0d6efd; }
-        .chat-message.rider { border-left: 4px solid #198754; }
-        .chat-message.system { background: #f8f9fa; border-left: 4px solid #6c757d; }
-        .chat-meta { font-size: 0.85rem; color: #6c757d; margin-bottom: 4px; }
-        .chat-content { color: #212529; white-space: pre-wrap; word-break: break-word; }
-        #chatMessages { min-height: 260px; max-height: 420px; overflow-y: auto; background: #ffffff; }
-        .order-history-card { border: 1px solid #e9ecef; border-radius: 12px; padding: 12px; margin-bottom: 10px; background: #fff; }
-    </style>
     <link href="/css/style.css?v=showcase" rel="stylesheet">
 </head>
 <body>
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+<nav class="navbar navbar-expand-lg navbar-dark">
     <div class="container">
         <a class="navbar-brand fw-bold" href="/">FoodShield</a>
-        <div class="navbar-nav ms-auto">
-            <a class="nav-link active" href="/user.html">用户端</a>
-            <a class="nav-link" href="/rider.html">骑手端</a>
-            <a class="nav-link" href="/admin.html">管理员端</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link active" href="/user.html">用户端</a>
+                <a class="nav-link" href="/rider.html">骑手端</a>
+                <a class="nav-link" href="/admin.html">管理员端</a>
+            </div>
         </div>
     </div>
 </nav>
@@ -58,89 +39,154 @@
 
     <div id="alertBox"></div>
 
-    <div class="row g-4">
+    <div class="row g-5">
         <div class="col-lg-4">
-            <div class="card step-card p-4">
-                <div class="step-title text-primary mb-2">1. 登录 / 注册</div>
+            <div class="card step-card p-5 animate-fadeInUp">
+                <div class="d-flex items-center gap-3 mb-5">
+                    <span class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary font-bold text-lg shadow-md">1</span>
+                    <div class="step-title text-primary">登录 / 注册</div>
+                </div>
                 <div class="section-tip mb-3" id="loginStatus">正在检查登录状态...</div>
 
                 <div id="loginForm">
-                    <div class="mb-2"><input id="loginUsername" type="text" class="form-control" placeholder="用户名"></div>
-                    <div class="mb-2"><input id="loginPassword" type="password" class="form-control" placeholder="密码"></div>
-                    <div class="d-grid mb-2"><button id="loginBtn" class="btn btn-primary" onclick="handleLogin()">登录</button></div>
-                    <div class="text-center"><a href="#" class="text-muted small" onclick="showRegisterForm(); return false;">没有账号？点击注册</a></div>
+                    <div class="mb-3">
+                        <input id="loginUsername" type="text" class="form-control" placeholder="用户名">
+                    </div>
+                    <div class="mb-3">
+                        <input id="loginPassword" type="password" class="form-control" placeholder="密码">
+                    </div>
+                    <div class="d-grid mb-3">
+                        <button id="loginBtn" class="btn btn-primary" onclick="handleLogin()">登录</button>
+                    </div>
+                    <div class="text-center">
+                        <a href="#" class="text-muted small" onclick="showRegisterForm(); return false;">没有账号？点击注册</a>
+                    </div>
                 </div>
 
                 <div id="registerForm" style="display:none;">
-                    <div class="mb-2"><input id="regUsername" type="text" class="form-control" placeholder="用户名"></div>
-                    <div class="mb-2"><input id="regPassword" type="password" class="form-control" placeholder="密码（至少6位）"></div>
-                    <div class="mb-2"><input id="regConfirmPassword" type="password" class="form-control" placeholder="确认密码"></div>
-                    <div class="mb-2 input-group">
+                    <div class="mb-3">
+                        <input id="regUsername" type="text" class="form-control" placeholder="用户名">
+                    </div>
+                    <div class="mb-3">
+                        <input id="regPassword" type="password" class="form-control" placeholder="密码（至少6位）">
+                    </div>
+                    <div class="mb-3">
+                        <input id="regConfirmPassword" type="password" class="form-control" placeholder="确认密码">
+                    </div>
+                    <div class="input-group mb-3">
                         <input id="regCaptcha" type="text" class="form-control" placeholder="验证码答案">
                         <button id="captchaBtn" class="btn btn-outline-secondary" type="button" onclick="refreshCaptcha()">获取验证码</button>
                     </div>
-                    <div id="captchaQuestion" class="section-tip mb-2 text-center" style="display:none;"></div>
-                    <div class="d-grid mb-2"><button id="registerBtn" class="btn btn-success" onclick="handleRegister()">注册</button></div>
-                    <div class="text-center"><a href="#" class="text-muted small" onclick="showLoginForm(); return false;">已有账号？返回登录</a></div>
+                    <div id="captchaQuestion" class="section-tip mb-3 text-center" style="display:none;"></div>
+                    <div class="d-grid mb-3">
+                        <button id="registerBtn" class="btn btn-success" onclick="handleRegister()">注册</button>
+                    </div>
+                    <div class="text-center">
+                        <a href="#" class="text-muted small" onclick="showLoginForm(); return false;">已有账号？返回登录</a>
+                    </div>
                 </div>
 
                 <div id="loggedInBox" style="display:none;">
-                    <div class="alert alert-success mb-2">已登录：<strong id="currentUsernameText"></strong></div>
-                    <div class="alert alert-info small mb-2">匿名身份 PID 已由平台后端生成并绑定，不在用户端明文展示。</div>
+                    <div class="alert alert-success mb-3">已登录：<strong id="currentUsernameText"></strong></div>
+                    <div class="alert alert-info small mb-3">匿名身份 PID 已由平台后端生成并绑定，不在用户端明文展示。</div>
                     <button class="btn btn-outline-secondary btn-sm w-100" onclick="handleLogout()">退出登录</button>
                 </div>
             </div>
         </div>
 
         <div class="col-lg-4">
-            <div class="card step-card p-4">
-                <div class="step-title text-success mb-2">2. 创建订单</div>
+            <div class="card step-card p-5 animate-fadeInUp" style="animation-delay: 0.1s;">
+                <div class="d-flex items-center gap-3 mb-5">
+                    <span class="w-10 h-10 rounded-xl bg-gradient-to-br from-success/20 to-success/5 flex items-center justify-center text-success font-bold text-lg shadow-md">2</span>
+                    <div class="step-title text-success">创建订单</div>
+                </div>
                 <div class="section-tip mb-3">必须登录后创建订单。前端不再提交 PID，后端从 session 绑定用户。</div>
-                <div class="mb-2">
+                
+                <div class="mb-3">
                     <label class="form-label">订单备注（用户可见，管理员默认不展示）</label>
                     <input id="remarkInput" type="text" class="form-control" placeholder="例如：请放宿舍楼下">
                 </div>
-                <div class="mb-2">
+                <div class="mb-3">
                     <label class="form-label">订单标签（用户端私有检索字段）</label>
                     <input id="tagInput" type="text" class="form-control" placeholder="例如：宿舍 / 教学楼 / 加急">
                 </div>
-                <div class="mb-3">
+                <div class="mb-4">
                     <label class="form-label">配送说明（骑手可见，不等同于用户标签）</label>
                     <input id="deliveryNoteInput" type="text" class="form-control" placeholder="例如：送到宿舍楼下，电话联系">
                 </div>
 
-                <div class="d-grid mb-3"><button id="createBtn" class="btn btn-success btn-lg" onclick="handleCreateOrder()" disabled>创建订单</button></div>
+                <div class="d-grid mb-4">
+                    <button id="createBtn" class="btn btn-success btn-lg" onclick="handleCreateOrder()" disabled>创建订单</button>
+                </div>
 
-                <div class="kv-row"><div class="kv-key">订单号</div><div id="orderIdBox" class="result-box">尚未生成</div></div>
-                <div class="kv-row"><div class="kv-key">时间戳</div><div id="timestampBox" class="result-box">尚未生成</div></div>
-                <div class="kv-row"><div class="kv-key">Token</div><div id="tokenBox" class="result-box">尚未生成</div></div>
-                <div class="kv-row"><div class="kv-key">订单状态</div><span id="statusBadge" class="badge text-bg-secondary badge-status">未创建</span></div>
+                <div class="space-y-3">
+                    <div class="kv-row">
+                        <div class="kv-key">订单号</div>
+                        <div id="orderIdBox" class="result-box">尚未生成</div>
+                    </div>
+                    <div class="kv-row">
+                        <div class="kv-key">时间戳</div>
+                        <div id="timestampBox" class="result-box">尚未生成</div>
+                    </div>
+                    <div class="kv-row">
+                        <div class="kv-key">Token</div>
+                        <div id="tokenBox" class="result-box">尚未生成</div>
+                    </div>
+                    <div class="kv-row">
+                        <div class="kv-key">订单状态</div>
+                        <span id="statusBadge" class="badge text-bg-secondary">未创建</span>
+                    </div>
+                </div>
             </div>
         </div>
 
         <div class="col-lg-4">
-            <div class="card step-card p-4">
-                <div class="step-title text-dark mb-2">3. 验证订单</div>
+            <div class="card step-card p-5 animate-fadeInUp" style="animation-delay: 0.2s;">
+                <div class="d-flex items-center gap-3 mb-5">
+                    <span class="w-10 h-10 rounded-xl bg-gradient-to-br from-secondary/20 to-secondary/5 flex items-center justify-center text-secondary font-bold text-lg shadow-md">3</span>
+                    <div class="step-title text-dark">验证订单</div>
+                </div>
                 <div class="section-tip mb-3">验证 token 是否属于当前登录用户创建的订单。PID 不在页面展示。</div>
-                <div class="mb-2"><label class="form-label">订单号</label><input id="verifyOrderId" type="text" class="form-control" readonly></div>
-                <div class="mb-2"><label class="form-label">时间戳</label><input id="verifyTimestamp" type="text" class="form-control" readonly></div>
-                <div class="mb-3"><label class="form-label">Token</label><textarea id="verifyToken" class="form-control" rows="3" readonly></textarea></div>
-                <div class="d-grid mb-3"><button id="verifyBtn" class="btn btn-dark btn-lg" onclick="handleVerifyOrder()">验证订单认证信息</button></div>
-                <div class="kv-row"><div class="kv-key">验证结果</div><div id="verifyResult" class="result-box">尚未验证</div></div>
-                <div class="mt-3 d-grid"><button class="btn btn-outline-danger" onclick="handleFakeVerify()">模拟篡改 Token 后验证</button></div>
+                
+                <div class="mb-3">
+                    <label class="form-label">订单号</label>
+                    <input id="verifyOrderId" type="text" class="form-control" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">时间戳</label>
+                    <input id="verifyTimestamp" type="text" class="form-control" readonly>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">Token</label>
+                    <textarea id="verifyToken" class="form-control" rows="3" readonly></textarea>
+                </div>
+                <div class="d-grid mb-4">
+                    <button id="verifyBtn" class="btn btn-primary btn-lg" onclick="handleVerifyOrder()">验证订单认证信息</button>
+                </div>
+                <div class="kv-row">
+                    <div class="kv-key">验证结果</div>
+                    <div id="verifyResult" class="result-box">尚未验证</div>
+                </div>
+                <div class="mt-3 d-grid">
+                    <button class="btn btn-outline-danger" onclick="handleFakeVerify()">模拟篡改 Token 后验证</button>
+                </div>
             </div>
         </div>
     </div>
 
     <div class="row g-4 mt-1">
         <div class="col-lg-4">
-            <div class="card step-card p-4">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <div class="step-title text-info">4. 我的订单历史</div>
+            <div class="card step-card p-5 animate-fadeInUp" style="animation-delay: 0.3s;">
+                <div class="d-flex justify-content-between align-items-center mb-5">
+                    <div class="d-flex items-center gap-3">
+                        <span class="w-10 h-10 rounded-xl bg-gradient-to-br from-info/20 to-info/5 flex items-center justify-center text-info font-bold text-lg shadow-md">4</span>
+                        <div class="step-title text-info">我的订单历史</div>
+                    </div>
                     <button class="btn btn-sm btn-outline-info" onclick="loadMyOrders()">刷新</button>
                 </div>
                 <div class="section-tip mb-3">只显示当前登录用户自己的订单。支持按订单号、备注、标签搜索；管理员端看不到备注和标签。</div>
-                <div class="input-group mb-2">
+                
+                <div class="input-group mb-3">
                     <input id="myOrderKeyword" type="text" class="form-control" placeholder="订单号 / 备注 / 标签">
                     <select id="myOrderStatus" class="form-select" style="max-width: 120px;">
                         <option value="">全部状态</option>
@@ -157,41 +203,59 @@
                 </div>
                 <div id="orderHistoryBox" class="result-box text-muted">登录后显示订单历史。</div>
 
-                <hr>
-                <div class="step-title text-danger fs-5 mb-2">6. 提交溯源申请</div>
-                <div class="section-tip mb-2">用户可按订单号提交投诉/异常申请，等待管理员审批后条件溯源；不需要也不能提交 PID。</div>
-                <input id="userTraceOrderId" type="text" class="form-control mb-2" placeholder="订单号（可从订单历史自动带入）">
-                <textarea id="userTraceReason" class="form-control mb-2" rows="2" placeholder="申请原因，例如：骑手骚扰 / 配送纠纷 / 异常订单"></textarea>
+                <hr class="my-4">
+                
+                <div class="d-flex items-center gap-2 mb-4">
+                    <span class="w-8 h-8 rounded-lg bg-danger/10 flex items-center justify-center text-danger font-bold">6</span>
+                    <div class="step-title text-danger">提交溯源申请</div>
+                </div>
+                <div class="section-tip mb-3">用户可按订单号提交投诉/异常申请，等待管理员审批后条件溯源；不需要也不能提交 PID。</div>
+                <input id="userTraceOrderId" type="text" class="form-control mb-3" placeholder="订单号（可从订单历史自动带入）">
+                <textarea id="userTraceReason" class="form-control mb-3" rows="2" placeholder="申请原因，例如：骑手骚扰 / 配送纠纷 / 异常订单"></textarea>
                 <button id="userTraceRequestBtn" class="btn btn-outline-danger w-100" onclick="submitUserTraceRequest()">提交溯源申请</button>
-                <div id="userTraceRequestResult" class="section-tip mt-2"></div>
+                <div id="userTraceRequestResult" class="section-tip mt-3"></div>
             </div>
         </div>
 
         <div class="col-lg-8">
-            <div class="card step-card p-4">
-                <div class="step-title text-warning mb-2">5. 进入匿名聊天</div>
-                <div class="section-tip mb-3">认证通过后进入订单房间，与骑手实时通信。聊天界面不展示 PID。</div>
+            <div class="card step-card p-5 animate-fadeInUp" style="animation-delay: 0.4s;">
+                <div class="d-flex items-center gap-3 mb-5">
+                    <span class="w-10 h-10 rounded-xl bg-gradient-to-br from-warning/20 to-warning/5 flex items-center justify-center text-warning font-bold text-lg shadow-md">5</span>
+                    <div class="step-title text-warning">进入匿名聊天</div>
+                </div>
+                <div class="section-tip mb-4">认证通过后进入订单房间，与骑手实时通信。聊天界面不展示 PID。</div>
 
-                <div class="d-flex gap-2 flex-wrap mb-3">
-                    <button id="joinChatBtn" class="btn btn-warning btn-lg text-dark" onclick="handleJoinChat()">进入聊天房间</button>
+                <div class="d-flex gap-3 flex-wrap mb-4">
+                    <button id="joinChatBtn" class="btn btn-warning btn-lg" onclick="handleJoinChat()">进入聊天房间</button>
                     <button class="btn btn-outline-secondary" onclick="loadMessageHistory()">刷新历史消息</button>
                 </div>
 
-                <div class="kv-row"><div class="kv-key">聊天状态</div><div id="chatStatusBox" class="result-box">尚未进入聊天房间</div></div>
-                <div class="kv-row">
-                    <div class="kv-key">用户端 Merkle Root</div>
-                    <div id="userMerkleRootBox" class="result-box">尚未同步消息 Root</div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div class="kv-row">
+                        <div class="kv-key">聊天状态</div>
+                        <div id="chatStatusBox" class="result-box">尚未进入聊天房间</div>
+                    </div>
+                    <div class="kv-row">
+                        <div class="kv-key">用户端 Merkle Root</div>
+                        <div id="userMerkleRootBox" class="result-box merkle-root">尚未同步消息 Root</div>
+                    </div>
                 </div>
-                <div class="d-flex gap-2 flex-wrap mt-2">
+                
+                <div class="d-flex gap-2 flex-wrap mb-4">
                     <button class="btn btn-sm btn-outline-warning" onclick="manualReportUserRoot()">上报用户端 Root</button>
                     <span class="section-tip align-self-center">用于管理员端“三端一致性验证”。</span>
                 </div>
-                <div class="mt-3"><label class="form-label">聊天记录</label><div id="chatMessages" class="result-box"></div></div>
-                <div class="mt-3">
+
+                <div class="mb-4">
+                    <label class="form-label">聊天记录</label>
+                    <div id="chatMessages"></div>
+                </div>
+
+                <div>
                     <label for="chatInput" class="form-label">发送消息</label>
                     <div class="input-group">
                         <input id="chatInput" type="text" class="form-control" placeholder="例如：骑手您好，请放宿舍楼下。">
-                        <button id="sendMsgBtn" class="btn btn-warning text-dark" onclick="handleSendMessage()" disabled>发送</button>
+                        <button id="sendMsgBtn" class="btn btn-warning" onclick="handleSendMessage()" disabled>发送</button>
                     </div>
                 </div>
             </div>
@@ -204,8 +268,8 @@
 const IS_FLASK_LOCAL = ["127.0.0.1", "localhost"].includes(window.location.hostname) && window.location.port === "5000";
 const FLASK_ORIGIN = window.location.hostname === "localhost" ? "http://localhost:5000" : "http://127.0.0.1:5000";
 const BASE_URL = IS_FLASK_LOCAL ? window.location.origin : FLASK_ORIGIN;
-const socket = createSafeSocket();
 
+let socket = null;
 let currentUser = null;
 let hasJoinedChatRoom = false;
 let currentMerkleRoot = null;
@@ -223,10 +287,81 @@ function createSafeSocket() {
     return io(BASE_URL, {
         path: "/socket.io",
         transports: ["polling", "websocket"],
-        autoConnect: true,
+        autoConnect: false,
         reconnection: false,
         withCredentials: true
     });
+}
+
+function initSocketListeners() {
+    if (!socket) return;
+    socket.on("connect", () => updateChatStatus("WebSocket 已连接，可进入聊天房间。", "secondary"));
+    socket.on("disconnect", () => { hasJoinedChatRoom = false; enableChatInput(false); updateChatStatus("连接已断开。", "danger"); });
+    socket.on("join_result", async (res) => {
+        console.log("🔥 JOIN_RESULT:", res);
+        if (res.success) {
+            hasJoinedChatRoom = true;
+            currentOrderId = res.order_id;
+            enableChatInput(true);
+            updateChatStatus(`已进入订单房间：${res.order_id}`, "success");
+            showAlert("success", res.message || "进入聊天房间成功。");
+            const savedRoot = localStorage.getItem("merkle_root_" + res.order_id);
+            if (savedRoot) {
+                currentMerkleRoot = savedRoot;
+                updateUserMerkleRootBox(savedRoot);
+                reportMerkleRoot(res.order_id, savedRoot, "user");
+            }
+            await loadMessageHistory();
+        } else {
+            hasJoinedChatRoom = false;
+            enableChatInput(false);
+            const errorMsg = res.message || "进入聊天房间失败。";
+            updateChatStatus(errorMsg, "danger");
+            if (errorMsg.includes("please login as the order owner first")) {
+                showAlert("danger", "会话验证失败：请刷新页面后重新登录，然后再次尝试进入聊天房间。");
+            } else {
+                showAlert("danger", errorMsg);
+            }
+        }
+    });
+    socket.on("system_message", msg => appendMessage({ type: "system", message: msg.message, timestamp: msg.timestamp }));
+    socket.on("receive_message", msg => {
+        appendMessage(msg);
+        if (msg.merkle_root) {
+            currentMerkleRoot = msg.merkle_root;
+            currentOrderId = msg.order_id || currentOrderId;
+            localStorage.setItem("merkle_root_" + currentOrderId, currentMerkleRoot);
+            updateUserMerkleRootBox(currentMerkleRoot);
+            reportMerkleRoot(currentOrderId, currentMerkleRoot, "user");
+        }
+    });
+    socket.on("message_saved", res => {
+        if (res && res.success && res.data && res.data.merkle_root) {
+            currentMerkleRoot = res.data.merkle_root;
+            currentOrderId = res.data.order_id || currentOrderId;
+            localStorage.setItem("merkle_root_" + currentOrderId, currentMerkleRoot);
+            updateUserMerkleRootBox(currentMerkleRoot);
+        }
+    });
+    socket.on("error_message", msg => showAlert("danger", msg.message || "聊天消息发送失败。"));
+}
+
+function connectSocketAfterLogin() {
+    if (socket && socket.connected) {
+        updateChatStatus("WebSocket 已连接。", "secondary");
+        return;
+    }
+    if (!socket) {
+        socket = createSafeSocket();
+        initSocketListeners();
+    }
+    socket.connect();
+}
+
+function disconnectSocket() {
+    if (socket) {
+        socket.disconnect();
+    }
 }
 
 function showAlert(type, message) {
@@ -271,8 +406,8 @@ function fillVerifyFields(order_id, timestamp, token) {
 function updateStatusBadge(status) {
     const badge = document.getElementById("statusBadge");
     badge.innerText = status || "未知";
-    badge.className = "badge badge-status";
-    badge.classList.add(["created", "taken", "delivering", "completed"].includes(status) ? "text-bg-success" : "text-bg-secondary");
+    badge.className = "badge";
+    badge.classList.add(["created", "taken", "delivering", "completed"].includes(status) ? "badge-success" : "text-bg-secondary");
 }
 
 function updateChatStatus(message, type = "secondary") {
@@ -292,6 +427,12 @@ function setAuthUI(loggedIn, user = null) {
     document.getElementById("loggedInBox").style.display = loggedIn ? "block" : "none";
     document.getElementById("loginStatus").innerText = loggedIn ? "已登录，可创建订单。" : "请先登录或注册。";
     document.getElementById("currentUsernameText").innerText = loggedIn ? user.username : "";
+    
+    if (loggedIn) {
+        connectSocketAfterLogin();
+    } else {
+        disconnectSocket();
+    }
 }
 
 async function checkSession() {
@@ -617,6 +758,7 @@ async function handleJoinChat() {
     const timestamp = document.getElementById("verifyTimestamp").value.trim();
     const token = document.getElementById("verifyToken").value.trim();
     if (!order_id || !timestamp || !token) return showAlert("warning", "请先登录并完成订单创建。");
+    if (!currentUser) return showAlert("warning", "请先登录后再进入聊天房间。");
 
     setButtonLoading("joinChatBtn", "进入中...", true);
     try {
@@ -634,14 +776,17 @@ async function handleJoinChat() {
         hasJoinedChatRoom = true;
         currentOrderId = order_id;
         enableChatInput(true);
-        updateChatStatus(`订单认证通过，已允许发送消息：${order_id}`, "success");
+        updateChatStatus(`订单认证通过，正在进入聊天房间...`, "secondary");
         if (socket.connected) {
+            updateChatStatus(`正在通过 WebSocket 连接订单房间...`, "secondary");
             socket.emit("join_order", { order_id, timestamp, token, role: "user" });
         } else {
             await loadMessageHistory();
+            updateChatStatus(`订单认证通过，已允许发送消息：${order_id}`, "success");
             showAlert("success", "订单认证通过。Socket 未连接时将使用 HTTP 保存消息。");
         }
     } catch (error) {
+        updateChatStatus("进入聊天房间失败。", "danger");
         showAlert("danger", "进入聊天房间失败，请检查后端是否启动。");
     } finally {
         setButtonLoading("joinChatBtn", "进入中...", false);
@@ -674,8 +819,7 @@ async function handleSendMessage() {
 
     contentInput.value = "";
     try {
-        const msg = await sendMessageHttpFallback(order_id, "user", content);
-        appendMessage(msg);
+        await sendMessageHttpFallback(order_id, "user", content);
     } catch (e) {
         contentInput.value = content;
         showAlert("danger", e.message || "聊天消息发送失败。");
@@ -737,67 +881,21 @@ async function reportMerkleRoot(orderId, merkleRoot, role) {
 async function manualReportUserRoot() {
     const orderId = currentOrderId || document.getElementById("verifyOrderId").value.trim();
     const root = currentMerkleRoot || (orderId ? localStorage.getItem("merkle_root_" + orderId) : null);
-    if (!orderId) return showAlert("warning", "请先创建或选择订单。 ");
-    if (!root) return showAlert("warning", "当前用户端还没有可上报的 Merkle Root。请先进入聊天并发送/接收一条消息。 ");
+    if (!orderId) return showAlert("warning", "请先创建或选择订单。");
+    if (!root) return showAlert("warning", "当前用户端还没有可上报的 Merkle Root。请先进入聊天并发送/接收一条消息。");
     const result = await reportMerkleRoot(orderId, root, "user");
     if (result.success) {
         updateUserMerkleRootBox(root);
-        showAlert("success", "用户端 Merkle Root 已上报，管理员端可进行三端一致性验证。 ");
+        showAlert("success", "用户端 Merkle Root 已上报，管理员端可进行三端一致性验证。");
     } else {
-        showAlert("danger", result.message || "用户端 Root 上报失败。 ");
+        showAlert("danger", result.message || "用户端 Root 上报失败。");
     }
 }
-
-socket.on("connect", () => updateChatStatus("WebSocket 已连接，可进入聊天房间。", "secondary"));
-socket.on("disconnect", () => { hasJoinedChatRoom = false; enableChatInput(false); updateChatStatus("连接已断开。", "danger"); });
-socket.on("join_result", async (res) => {
-    console.log("🔥 JOIN_RESULT:", res); 
-    if (res.success) {
-        hasJoinedChatRoom = true;
-        currentOrderId = res.order_id;
-        enableChatInput(true);
-        updateChatStatus(`已进入订单房间：${res.order_id}`, "success");
-        showAlert("success", res.message || "进入聊天房间成功。");
-        const savedRoot = localStorage.getItem("merkle_root_" + res.order_id);
-        if (savedRoot) {
-            currentMerkleRoot = savedRoot;
-            updateUserMerkleRootBox(savedRoot);
-            reportMerkleRoot(res.order_id, savedRoot, "user");
-        }
-        await loadMessageHistory();
-    } else {
-        hasJoinedChatRoom = false;
-        enableChatInput(false);
-        updateChatStatus(res.message || "进入聊天房间失败。", "danger");
-        showAlert("danger", res.message || "进入聊天房间失败。");
-    }
-});
-socket.on("system_message", msg => appendMessage({ type: "system", message: msg.message, timestamp: msg.timestamp }));
-socket.on("receive_message", msg => {
-    appendMessage(msg);
-    if (msg.merkle_root) {
-        currentMerkleRoot = msg.merkle_root;
-        currentOrderId = msg.order_id || currentOrderId;
-        localStorage.setItem("merkle_root_" + currentOrderId, currentMerkleRoot);
-        updateUserMerkleRootBox(currentMerkleRoot);
-        reportMerkleRoot(currentOrderId, currentMerkleRoot, "user");
-    }
-});
-socket.on("message_saved", res => {
-    if (res && res.success && res.data && res.data.merkle_root) {
-        currentMerkleRoot = res.data.merkle_root;
-        currentOrderId = res.data.order_id || currentOrderId;
-        localStorage.setItem("merkle_root_" + currentOrderId, currentMerkleRoot);
-        updateUserMerkleRootBox(currentMerkleRoot);
-    }
-});
-socket.on("error_message", msg => showAlert("danger", msg.message || "聊天消息发送失败。"));
 
 window.addEventListener("DOMContentLoaded", async () => {
     enableChatInput(false);
     updateUserMerkleRootBox(null);
     await checkSession();
-    refreshCaptcha();
 });
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

@@ -1,69 +1,14 @@
 <!DOCTYPE html>
-
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>管理员端 - 日志审计与溯源</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body {
-            background: #f5f7fb;
-        }
-        .navbar {
-            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-        }
-        .card {
-            border: none;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            margin-bottom: 20px;
-        }
-        .log-table td, .log-table th {
-            vertical-align: middle;
-        }
-        .hash-text {
-            font-family: monospace;
-            font-size: 0.85rem;
-            color: #6c757d;
-            word-break: break-all;
-        }
-        .merkle-root {
-            font-family: monospace;
-            font-size: 0.85rem;
-            color: #d63384;
-            word-break: break-all;
-        }
-        .order-list {
-            max-height: 320px;
-            overflow-y: auto;
-        }
-        .order-item {
-            cursor: pointer;
-        }
-        .order-item:hover {
-            background: #f8f9fa;
-        }
-        pre.json-box {
-            margin: 0;
-            white-space: pre-wrap;
-            word-break: break-word;
-            font-size: 0.85rem;
-        }
-        .login-container {
-            max-width: 400px;
-            margin: 80px auto;
-        }
-        .login-card {
-            border: none;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-        }
-    </style>
     <link href="/css/style.css?v=showcase" rel="stylesheet">
 </head>
 <body>
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+<nav class="navbar navbar-expand-lg navbar-dark">
     <div class="container">
         <a class="navbar-brand fw-bold" href="/">FoodShield 管理后台</a>
         <div class="navbar-nav ms-auto">
@@ -73,16 +18,15 @@
         </div>
         <div class="navbar-nav ms-auto">
             <span id="adminUserBadge" class="navbar-text text-light me-3" style="display:none;"></span>
-            <button id="logoutBtn" class="btn btn-outline-light btn-sm" style="display:none;" onclick="handleAdminLogout()">登出</button>
+            <button id="logoutBtn" class="btn btn-outline-secondary btn-sm" style="display:none;" onclick="handleAdminLogout()">登出</button>
         </div>
     </div>
 </nav>
 
-<!-- 管理员登录界面 -->
 <div id="adminLogin" class="login-container">
-    <div class="card login-card p-4">
-        <h4 class="text-center mb-3">管理员登录</h4>
-        <p class="text-muted text-center small mb-4">请输入管理员账号和密码</p>
+    <div class="login-card">
+        <h4>管理员登录</h4>
+        <p>请输入管理员账号和密码</p>
         <div id="loginAlertBox"></div>
         <div class="mb-3">
             <label for="adminUsername" class="form-label">用户名</label>
@@ -98,7 +42,6 @@
     </div>
 </div>
 
-<!-- 管理面板（登录后可见） -->
 <div id="adminPanel" style="display:none;">
 <div class="container page-shell">
     <section class="page-hero">
@@ -115,27 +58,27 @@
 
 <div class="row" id="adminMain">
     <div class="col-lg-4">
-        <div class="card p-3">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="fw-bold mb-0">📦 订单列表</h5>
+        <div class="card p-5">
+            <div class="d-flex justify-content-between align-items-center mb-5">
+                <h5 class="fw-bold text-lg">📦 订单列表</h5>
                 <button class="btn btn-sm btn-outline-primary" onclick="loadOrders()">刷新</button>
             </div>
             <div id="orderList" class="list-group order-list">
-                <div class="list-group-item text-muted text-center">点击刷新加载订单</div>
+                <div class="list-group-item text-muted text-center py-4">点击刷新加载订单</div>
             </div>
         </div>
 
-        <div class="card p-3">
-            <h5 class="fw-bold mb-3">🔍 审计搜索</h5>
-            <div class="mb-2">
+        <div class="card p-5">
+            <h5 class="fw-bold mb-5 text-lg">🔍 审计搜索</h5>
+            <div class="mb-3">
                 <label class="form-label small">订单号</label>
                 <input type="text" id="orderIdInput" class="form-control" placeholder="输入订单号">
             </div>
-            <div class="mb-2">
+            <div class="mb-3">
                 <label class="form-label small">消息 Hash</label>
                 <input type="text" id="adminHashInput" class="form-control" placeholder="输入完整或部分消息哈希">
             </div>
-            <div class="mb-2">
+            <div class="mb-3">
                 <label class="form-label small">审计动作</label>
                 <select id="adminActionInput" class="form-select">
                     <option value="">全部动作</option>
@@ -146,7 +89,7 @@
                     <option value="TRACE_KEYWORD_SCAN_BLOCKED">TRACE_KEYWORD_SCAN_BLOCKED</option>
                 </select>
             </div>
-            <div class="d-grid gap-2 mb-2">
+            <div class="d-grid gap-2 mb-3">
                 <button class="btn btn-primary" onclick="fetchLogs()">按订单号加载 Hash 记录</button>
                 <button class="btn btn-outline-primary" onclick="searchAdminOrders()">搜索审计订单</button>
             </div>
@@ -156,43 +99,45 @@
             </div>
         </div>
 
-        <div class="card p-3">
-            <h5 class="fw-bold mb-3">🛡️ 安全审计 (Merkle Tree)</h5>
-            <button class="btn btn-outline-success mb-2 w-100" onclick="sealLogs()">1. 生成快照 (Snapshot)</button>
-            <button class="btn btn-outline-warning mb-2 w-100" onclick="verifyLogs()">2. 验证完整性</button>
-            <button class="btn btn-outline-primary w-100" onclick="verifyThreePartyConsistency()">3. 三端 Root 一致性验证</button>
-            <div id="auditResult" class="mt-3 small"></div>
+        <div class="card p-5">
+            <h5 class="fw-bold mb-5 text-lg">🛡️ 安全审计 (Merkle Tree)</h5>
+            <div class="d-grid gap-3">
+                <button class="btn btn-outline-success" onclick="sealLogs()">1. 生成快照 (Snapshot)</button>
+                <button class="btn btn-outline-warning" onclick="verifyLogs()">2. 验证完整性</button>
+                <button class="btn btn-outline-primary" onclick="verifyThreePartyConsistency()">3. 三端 Root 一致性验证</button>
+            </div>
+            <div id="auditResult" class="mt-4 small"></div>
         </div>
 
-        <div class="card p-3 border-primary">
-            <h5 class="fw-bold mb-3 text-primary">🔗 三端一致性</h5>
-            <p class="small text-muted mb-2">
+        <div class="card p-5 border-primary">
+            <h5 class="fw-bold mb-4 text-lg text-primary">🔗 三端一致性</h5>
+            <p class="small text-muted mb-3">
                 对同一订单比对管理员端当前 Root、用户端上报 Root、骑手端上报 Root。三者完全一致才说明三方消息视图一致。
             </p>
             <div id="threePartyResult" class="small text-muted">请先输入订单号，再点击“三端 Root 一致性验证”。</div>
         </div>
 
-        <div class="card p-3 border-warning">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <h5 class="fw-bold mb-0 text-warning">📨 溯源申请审批</h5>
+        <div class="card p-5 border-warning">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="fw-bold text-lg text-warning">📨 溯源申请审批</h5>
                 <button class="btn btn-sm btn-outline-warning" onclick="loadTraceRequests()">刷新</button>
             </div>
-            <p class="small text-muted mb-2">
+            <p class="small text-muted mb-4">
                 用户端和骑手端均可按订单号提交溯源申请；管理员审批后才执行条件溯源，全流程写入审计日志。
             </p>
             <div id="traceRequestList" class="small">
-                <div class="text-muted">点击刷新加载待审批申请。</div>
+                <div class="text-muted py-3">点击刷新加载待审批申请。</div>
             </div>
         </div>
 
-        <div class="card p-3 border-danger">
-            <h5 class="fw-bold mb-3 text-danger">🚨 条件溯源</h5>
-            <p class="small text-muted mb-2">
+        <div class="card p-5 border-danger">
+            <h5 class="fw-bold mb-4 text-lg text-danger">🚨 条件溯源</h5>
+            <p class="small text-muted mb-3">
                 输入订单号和溯源原因，系统根据订单映射恢复真实身份，并记录 TRACE_SUCCESS / TRACE_FAIL 审计日志。
                 推荐先由用户端/骑手端提交申请，再由管理员审批触发。
             </p>
-            <input type="text" id="traceOrderIdInput" class="form-control mb-2" placeholder="输入订单号（而不是 PID）">
-            <input type="text" id="reasonInput" class="form-control mb-2" placeholder="输入溯源原因（如：投诉处理）">
+            <input type="text" id="traceOrderIdInput" class="form-control mb-3" placeholder="输入订单号（而不是 PID）">
+            <input type="text" id="reasonInput" class="form-control mb-3" placeholder="输入溯源原因（如：投诉处理）">
             <button class="btn btn-danger w-100" onclick="traceViolation()">启动溯源程序</button>
         </div>
     </div>
@@ -200,11 +145,11 @@
     <div class="col-lg-8">
         <div id="alertBox"></div>
 
-        <div class="card p-3">
-            <h5 class="fw-bold mb-3">📜 通信记录</h5>
+        <div class="card p-5">
+            <h5 class="fw-bold mb-5 text-lg">📜 通信记录</h5>
             <div class="table-responsive">
-                <table class="table table-hover log-table">
-                    <thead class="table-light">
+                <table class="table table-hover">
+                    <thead>
                         <tr>
                             <th>时间戳</th>
                             <th>角色</th>
@@ -213,17 +158,17 @@
                         </tr>
                     </thead>
                     <tbody id="logBody">
-                        <tr><td colspan="4" class="text-center text-muted">请输入订单号或从左侧选择订单...</td></tr>
+                        <tr><td colspan="4" class="text-center text-muted py-8">请输入订单号或从左侧选择订单...</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
 
-        <div class="card p-3">
-            <h5 class="fw-bold mb-3">🧾 审计日志</h5>
+        <div class="card p-4">
+            <h5 class="fw-bold mb-4">🧾 审计日志</h5>
             <div class="table-responsive">
-                <table class="table table-hover log-table">
-                    <thead class="table-light">
+                <table class="table table-hover">
+                    <thead>
                         <tr>
                             <th>时间</th>
                             <th>动作</th>
@@ -238,22 +183,18 @@
             </div>
         </div>
 
-        <div class="card p-3" id="traceResultCard" style="display: none;">
-            <h5 class="fw-bold mb-3 text-danger">🔎 溯源结果报告</h5>
-            <div id="traceResultBody" class="p-3 bg-light rounded"></div>
+        <div class="card p-4" id="traceResultCard" style="display: none;">
+            <h5 class="fw-bold mb-4 text-danger">🔎 溯源结果报告</h5>
+            <div id="traceResultBody" class="p-4 bg-surface-alt rounded-lg"></div>
         </div>
     </div>
 </div>
-
-
 </div>
 
 <script>
     function showAlert(type, message) {
         const alertBox = document.getElementById("alertBox");
-        if (!alertBox) {
-            return;
-        }
+        if (!alertBox) return;
 
         alertBox.innerHTML = `
             <div class="alert alert-${type} alert-dismissible fade show">
@@ -358,7 +299,6 @@
         }
 
         if (res.status === 403) {
-            // Session expired or not logged in
             showAdminLogin();
             throw new Error("管理员会话已过期，请重新登录");
         }
@@ -526,252 +466,133 @@
                 return `
                     <tr>
                         <td class="small">${escapeHtml(log.created_at || "-")}</td>
-                        <td><span class="badge bg-info text-dark">${escapeHtml(log.action || "-")}</span></td>
+                        <td><span class="badge bg-info">${escapeHtml(log.action || "-")}</span></td>
                         <td class="merkle-root">${escapeHtml(log.merkle_root || "-")}</td>
                         <td><pre class="json-box">${escapeHtml(detailText)}</pre></td>
-
-
-                </tr>
-            `;
-        }).join("");
-    } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">加载失败：${escapeHtml(e.message)}</td></tr>`;
-        showAlert("danger", `获取审计日志失败：${escapeHtml(e.message)}`);
-    }
-}
-
-async function sealLogs() {
-    const orderId = document.getElementById("orderIdInput").value.trim();
-    if (!orderId) {
-        return showAlert("warning", "请先输入订单号！");
-    }
-
-    try {
-        const json = await apiRequest(`/admin/snapshot/${encodeURIComponent(orderId)}`, {
-            method: "POST"
-        });
-
-        const data = json.data || {};
-        document.getElementById("auditResult").innerHTML = `
-            <div class="text-success fw-bold mb-2">✅ 快照生成成功</div>
-            <div>message_count: ${escapeHtml(data.message_count ?? "-")}</div>
-            <div class="mt-2">Merkle Root:</div>
-            <div class="merkle-root">${escapeHtml(data.merkle_root || "-")}</div>
-        `;
-
-        await fetchAuditLogs(orderId);
-        await loadOrders();
-    } catch (e) {
-        showAlert("danger", `封存日志请求失败：${escapeHtml(e.message)}`);
-    }
-}
-
-async function verifyLogs() {
-    const orderId = document.getElementById("orderIdInput").value.trim();
-    if (!orderId) {
-        return showAlert("warning", "请先输入订单号！");
-    }
-
-    try {
-        const json = await apiRequest(`/admin/verify/${encodeURIComponent(orderId)}`, {
-            method: "POST"
-        });
-
-        const data = json.data || {};
-        const ok = !!data.root_match;
-
-        document.getElementById("auditResult").innerHTML = `
-            <div class="${ok ? 'text-success' : 'text-danger'} fw-bold mb-2">
-                ${ok ? "✅ 完整性验证通过" : "❌ 完整性验证失败"}
-            </div>
-            <div>hash_mismatch_count: ${escapeHtml(data.hash_mismatch_count ?? "-")}</div>
-            <div>root_match: ${escapeHtml(data.root_match ?? "-")}</div>
-            <div class="mt-2">snapshot_root:</div>
-            <div class="merkle-root">${escapeHtml(data.snapshot_root || "-")}</div>
-            <div class="mt-2">current_root:</div>
-            <div class="merkle-root">${escapeHtml(data.current_root || "-")}</div>
-        `;
-
-        await fetchAuditLogs(orderId);
-        await loadOrders();
-    } catch (e) {
-        showAlert("danger", `验证请求失败：${escapeHtml(e.message)}`);
-    }
-}
-
-async function verifyThreePartyConsistency() {
-    const orderId = document.getElementById("orderIdInput").value.trim();
-    if (!orderId) {
-        return showAlert("warning", "请先输入订单号！");
-    }
-
-    const box = document.getElementById("threePartyResult");
-    box.innerHTML = `<div class="text-muted">正在执行三端一致性验证...</div>`;
-
-    try {
-        const json = await apiRequest(`/admin/three_party_consistency/${encodeURIComponent(orderId)}`, {
-            method: "POST"
-        });
-        const data = json.data || {};
-        const ok = !!data.all_match;
-        const missing = (data.missing_roles || []).join(", ") || "无";
-
-        box.innerHTML = `
-            <div class="${ok ? 'text-success' : 'text-danger'} fw-bold mb-2">
-                ${ok ? '✅ 三端 Root 一致：三方消息视图一致' : '❌ 三端 Root 不一致 / 有端未上报'}
-            </div>
-            <div>message_count: ${escapeHtml(data.message_count ?? '-')}</div>
-            <div>all_present: ${escapeHtml(data.all_present ?? '-')}</div>
-            <div>all_match: ${escapeHtml(data.all_match ?? '-')}</div>
-            <div>missing_roles: ${escapeHtml(missing)}</div>
-            <hr>
-            <div class="fw-bold">管理员端当前 Root</div>
-            <div class="merkle-root">${escapeHtml(data.admin_root || '-')}</div>
-            <div class="fw-bold mt-2">用户端上报 Root</div>
-            <div class="merkle-root">${escapeHtml(data.user_root || '-')}</div>
-            <div class="small text-muted">user_report_time: ${escapeHtml(data.user_report_time || '-')}</div>
-            <div class="fw-bold mt-2">骑手端上报 Root</div>
-            <div class="merkle-root">${escapeHtml(data.rider_root || '-')}</div>
-            <div class="small text-muted">rider_report_time: ${escapeHtml(data.rider_report_time || '-')}</div>
-            <div class="fw-bold mt-2">最近一次管理员快照 Root</div>
-            <div class="merkle-root">${escapeHtml(data.latest_snapshot_root || '-')}</div>
-        `;
-
-        document.getElementById("auditResult").innerHTML = `
-            <div class="${ok ? 'text-success' : 'text-danger'} fw-bold mb-2">
-                ${ok ? '✅ 三端一致性验证通过' : '❌ 三端一致性验证未通过'}
-            </div>
-            <div class="small text-muted">只有管理员端、用户端、骑手端 Root 同时一致，才认为同一订单三方消息完全一致。</div>
-        `;
-
-        await fetchAuditLogs(orderId);
-        await loadOrders();
-    } catch (e) {
-        box.innerHTML = `<div class="text-danger">三端一致性验证失败：${escapeHtml(e.message)}</div>`;
-        showAlert("danger", `三端一致性验证失败：${escapeHtml(e.message)}`);
-    }
-}
-
-function renderTraceResult(orderId, data, titleText = "TRACE_SUCCESS") {
-    const card = document.getElementById("traceResultCard");
-    const body = document.getElementById("traceResultBody");
-    const orders = data.orders || [];
-    const ordersHtml = orders.length > 0
-        ? `<ul class="mb-0">
-            ${orders.map(order => `
-                <li class="mb-2">
-                    <div><strong>order_id:</strong> <span class="hash-text">${escapeHtml(order.order_id)}</span></div>
-                    <div><strong>status:</strong> ${escapeHtml(order.status)}</div>
-                    <div><strong>created_at:</strong> ${escapeHtml(order.created_at)}</div>
-                </li>
-            `).join("")}
-        </ul>`
-        : `<div class="text-muted">无关联订单</div>`;
-
-    body.innerHTML = `
-        <div class="alert alert-danger">
-            <strong>${escapeHtml(titleText)}</strong>：已按订单号触发条件溯源；PID 仍由后端内部维护，不在管理员页面展示。
-        </div>
-        <div class="mb-2"><strong>触发订单号：</strong><span class="hash-text">${escapeHtml(orderId)}</span></div>
-        <div class="mb-2"><strong>用户名：</strong>${escapeHtml(data.username)}</div>
-        <div class="mb-2"><strong>用户ID：</strong>${escapeHtml(data.user_id)}</div>
-        <div class="mb-2"><strong>注册时间：</strong>${escapeHtml(data.created_at)}</div>
-        <div class="mb-2"><strong>关联订单：</strong></div>
-        ${ordersHtml}
-    `;
-    card.style.display = "block";
-}
-
-async function loadTraceRequests() {
-    const box = document.getElementById("traceRequestList");
-    if (!box) return;
-    box.innerHTML = `<div class="text-muted">加载中...</div>`;
-    try {
-        const json = await apiRequest("/admin/trace_requests?status=pending");
-        const requests = json.data || [];
-        if (requests.length === 0) {
-            box.innerHTML = `<div class="text-muted">暂无待审批溯源申请。</div>`;
-            return;
+                    </tr>
+                `;
+            }).join("");
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">加载失败：${escapeHtml(e.message)}</td></tr>`;
+            showAlert("danger", `获取审计日志失败：${escapeHtml(e.message)}`);
         }
-        box.innerHTML = requests.map(req => `
-            <div class="border rounded p-2 mb-2 bg-light">
-                <div><strong>#${escapeHtml(req.id)}</strong> · ${escapeHtml(req.requester_role === "user" ? "用户端申请" : "骑手端申请")}</div>
-                <div>订单号：<span class="hash-text">${escapeHtml(req.order_id)}</span></div>
-                <div>订单状态：${escapeHtml(req.order_status || "-")}</div>
-                <div>申请原因：${escapeHtml(req.reason || "-")}</div>
-                <div>提交时间：${escapeHtml(req.created_at || "-")}</div>
-                <div class="d-flex gap-2 mt-2">
-                    <button class="btn btn-sm btn-danger" onclick="approveTraceRequest(${Number(req.id)})">同意并溯源</button>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="rejectTraceRequest(${Number(req.id)})">拒绝</button>
-                    <button class="btn btn-sm btn-outline-primary" onclick="fillOrderId('${escapeHtml(req.order_id)}')">查看订单</button>
+    }
+
+    async function sealLogs() {
+        const orderId = document.getElementById("orderIdInput").value.trim();
+        if (!orderId) {
+            return showAlert("warning", "请先输入订单号！");
+        }
+
+        try {
+            const json = await apiRequest(`/admin/snapshot/${encodeURIComponent(orderId)}`, {
+                method: "POST"
+            });
+
+            const data = json.data || {};
+            document.getElementById("auditResult").innerHTML = `
+                <div class="text-success fw-bold mb-2">✅ 快照生成成功</div>
+                <div>message_count: ${escapeHtml(data.message_count ?? "-")}</div>
+                <div class="mt-2">Merkle Root:</div>
+                <div class="merkle-root">${escapeHtml(data.merkle_root || "-")}</div>
+            `;
+
+            await fetchAuditLogs(orderId);
+            await loadOrders();
+        } catch (e) {
+            showAlert("danger", `封存日志请求失败：${escapeHtml(e.message)}`);
+        }
+    }
+
+    async function verifyLogs() {
+        const orderId = document.getElementById("orderIdInput").value.trim();
+        if (!orderId) {
+            return showAlert("warning", "请先输入订单号！");
+        }
+
+        try {
+            const json = await apiRequest(`/admin/verify/${encodeURIComponent(orderId)}`, {
+                method: "POST"
+            });
+
+            const data = json.data || {};
+            const ok = !!data.root_match;
+
+            document.getElementById("auditResult").innerHTML = `
+                <div class="${ok ? 'text-success' : 'text-danger'} fw-bold mb-2">
+                    ${ok ? "✅ 完整性验证通过" : "❌ 完整性验证失败"}
                 </div>
-            </div>
-        `).join("");
-    } catch (e) {
-        box.innerHTML = `<div class="text-danger">加载失败：${escapeHtml(e.message)}</div>`;
-    }
-}
+                <div>hash_mismatch_count: ${escapeHtml(data.hash_mismatch_count ?? "-")}</div>
+                <div>root_match: ${escapeHtml(data.root_match ?? "-")}</div>
+                <div class="mt-2">snapshot_root:</div>
+                <div class="merkle-root">${escapeHtml(data.snapshot_root || "-")}</div>
+                <div class="mt-2">current_root:</div>
+                <div class="merkle-root">${escapeHtml(data.current_root || "-")}</div>
+            `;
 
-async function approveTraceRequest(requestId) {
-    const admin_note = prompt("请输入审批备注（可选）：", "同意溯源申请") || "";
-    try {
-        const json = await apiRequest(`/admin/trace_requests/${requestId}/approve`, {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ admin_note })
-        });
-        const data = json.data || {};
-        const traceResult = data.trace_result || {};
-        const orderId = data.order_id || "";
-        renderTraceResult(orderId, traceResult, "TRACE_REQUEST_APPROVED");
-        document.getElementById("orderIdInput").value = orderId;
-        document.getElementById("traceOrderIdInput").value = orderId;
-        await fetchAuditLogs(orderId);
-        await loadTraceRequests();
-        await loadOrders();
-        showAlert("success", "已同意溯源申请并完成按订单号溯源。全流程已写入审计日志。");
-    } catch (e) {
-        showAlert("danger", `审批失败：${escapeHtml(e.message)}`);
-    }
-}
-
-async function rejectTraceRequest(requestId) {
-    const admin_note = prompt("请输入拒绝原因：", "证据不足，暂不触发溯源") || "证据不足，暂不触发溯源";
-    try {
-        await apiRequest(`/admin/trace_requests/${requestId}/reject`, {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ admin_note })
-        });
-        await loadTraceRequests();
-        showAlert("success", "已拒绝该溯源申请，并写入审计日志。");
-    } catch (e) {
-        showAlert("danger", `拒绝失败：${escapeHtml(e.message)}`);
-    }
-}
-
-async function traceViolation() {
-    const traceOrderInput = document.getElementById("traceOrderIdInput");
-    const orderId = (traceOrderInput.value.trim() || document.getElementById("orderIdInput").value.trim());
-    const reason = document.getElementById("reasonInput").value.trim();
-
-    if (!orderId || !reason) {
-        return showAlert("warning", "必须提供订单号和溯源原因！");
+            await fetchAuditLogs(orderId);
+            await loadOrders();
+        } catch (e) {
+            showAlert("danger", `验证请求失败：${escapeHtml(e.message)}`);
+        }
     }
 
-    try {
-        const json = await apiRequest("/admin/trace", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ order_id: orderId, reason })
-        });
+    async function verifyThreePartyConsistency() {
+        const orderId = document.getElementById("orderIdInput").value.trim();
+        if (!orderId) {
+            return showAlert("warning", "请先输入订单号！");
+        }
 
-        const data = json.data || {};
+        const box = document.getElementById("threePartyResult");
+        box.innerHTML = `<div class="text-muted">正在执行三端一致性验证...</div>`;
+
+        try {
+            const json = await apiRequest(`/admin/three_party_consistency/${encodeURIComponent(orderId)}`, {
+                method: "POST"
+            });
+            const data = json.data || {};
+            const ok = !!data.all_match;
+            const missing = (data.missing_roles || []).join(", ") || "无";
+
+            box.innerHTML = `
+                <div class="${ok ? 'text-success' : 'text-danger'} fw-bold mb-2">
+                    ${ok ? '✅ 三端 Root 一致：三方消息视图一致' : '❌ 三端 Root 不一致 / 有端未上报'}
+                </div>
+                <div>message_count: ${escapeHtml(data.message_count ?? '-')}</div>
+                <div>all_present: ${escapeHtml(data.all_present ?? '-')}</div>
+                <div>all_match: ${escapeHtml(data.all_match ?? '-')}</div>
+                <div>missing_roles: ${escapeHtml(missing)}</div>
+                <hr>
+                <div class="fw-bold">管理员端当前 Root</div>
+                <div class="merkle-root">${escapeHtml(data.admin_root || '-')}</div>
+                <div class="fw-bold mt-2">用户端上报 Root</div>
+                <div class="merkle-root">${escapeHtml(data.user_root || '-')}</div>
+                <div class="small text-muted">user_report_time: ${escapeHtml(data.user_report_time || '-')}</div>
+                <div class="fw-bold mt-2">骑手端上报 Root</div>
+                <div class="merkle-root">${escapeHtml(data.rider_root || '-')}</div>
+                <div class="small text-muted">rider_report_time: ${escapeHtml(data.rider_report_time || '-')}</div>
+                <div class="fw-bold mt-2">最近一次管理员快照 Root</div>
+                <div class="merkle-root">${escapeHtml(data.latest_snapshot_root || '-')}</div>
+            `;
+
+            document.getElementById("auditResult").innerHTML = `
+                <div class="${ok ? 'text-success' : 'text-danger'} fw-bold mb-2">
+                    ${ok ? '✅ 三端一致性验证通过' : '❌ 三端一致性验证未通过'}
+                </div>
+                <div class="small text-muted">只有管理员端、用户端、骑手端 Root 同时一致，才认为同一订单三方消息完全一致。</div>
+            `;
+
+            await fetchAuditLogs(orderId);
+            await loadOrders();
+        } catch (e) {
+            box.innerHTML = `<div class="text-danger">三端一致性验证失败：${escapeHtml(e.message)}</div>`;
+            showAlert("danger", `三端一致性验证失败：${escapeHtml(e.message)}`);
+        }
+    }
+
+    function renderTraceResult(orderId, data, titleText = "TRACE_SUCCESS") {
         const card = document.getElementById("traceResultCard");
         const body = document.getElementById("traceResultBody");
-
         const orders = data.orders || [];
         const ordersHtml = orders.length > 0
             ? `<ul class="mb-0">
@@ -787,7 +608,7 @@ async function traceViolation() {
 
         body.innerHTML = `
             <div class="alert alert-danger">
-                <strong>TRACE_SUCCESS</strong>：已按订单号触发条件溯源；PID 仍由后端内部维护，不在管理员页面展示。
+                <strong>${escapeHtml(titleText)}</strong>：已按订单号触发条件溯源；PID 仍由后端内部维护，不在管理员页面展示。
             </div>
             <div class="mb-2"><strong>触发订单号：</strong><span class="hash-text">${escapeHtml(orderId)}</span></div>
             <div class="mb-2"><strong>用户名：</strong>${escapeHtml(data.username)}</div>
@@ -796,22 +617,138 @@ async function traceViolation() {
             <div class="mb-2"><strong>关联订单：</strong></div>
             ${ordersHtml}
         `;
-
         card.style.display = "block";
-        document.getElementById("orderIdInput").value = orderId;
-        await fetchAuditLogs(orderId);
-        showAlert("success", "溯源成功，结果已展示，并已写入审计日志。");
-    } catch (e) {
-        document.getElementById("traceResultCard").style.display = "none";
-        showAlert("danger", `溯源请求失败：${escapeHtml(e.message)}`);
     }
-}
+
+    async function loadTraceRequests() {
+        const box = document.getElementById("traceRequestList");
+        if (!box) return;
+        box.innerHTML = `<div class="text-muted">加载中...</div>`;
+        try {
+            const json = await apiRequest("/admin/trace_requests?status=pending");
+            const requests = json.data || [];
+            if (requests.length === 0) {
+                box.innerHTML = `<div class="text-muted">暂无待审批溯源申请。</div>`;
+                return;
+            }
+            box.innerHTML = requests.map(req => `
+                <div class="border rounded-lg p-3 mb-3 bg-surface-alt">
+                    <div><strong>#${escapeHtml(req.id)}</strong> · ${escapeHtml(req.requester_role === "user" ? "用户端申请" : "骑手端申请")}</div>
+                    <div>订单号：<span class="hash-text">${escapeHtml(req.order_id)}</span></div>
+                    <div>订单状态：${escapeHtml(req.order_status || "-")}</div>
+                    <div>申请原因：${escapeHtml(req.reason || "-")}</div>
+                    <div>提交时间：${escapeHtml(req.created_at || "-")}</div>
+                    <div class="d-flex gap-2 mt-3">
+                        <button class="btn btn-sm btn-danger" onclick="approveTraceRequest(${Number(req.id)})">同意并溯源</button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="rejectTraceRequest(${Number(req.id)})">拒绝</button>
+                        <button class="btn btn-sm btn-outline-primary" onclick="fillOrderId('${escapeHtml(req.order_id)}')">查看订单</button>
+                    </div>
+                </div>
+            `).join("");
+        } catch (e) {
+            box.innerHTML = `<div class="text-danger">加载失败：${escapeHtml(e.message)}</div>`;
+        }
+    }
+
+    async function approveTraceRequest(requestId) {
+        const admin_note = prompt("请输入审批备注（可选）：", "同意溯源申请") || "";
+        try {
+            const json = await apiRequest(`/admin/trace_requests/${requestId}/approve`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ admin_note })
+            });
+            const data = json.data || {};
+            const traceResult = data.trace_result || {};
+            const orderId = data.order_id || "";
+            renderTraceResult(orderId, traceResult, "TRACE_REQUEST_APPROVED");
+            document.getElementById("orderIdInput").value = orderId;
+            document.getElementById("traceOrderIdInput").value = orderId;
+            await fetchAuditLogs(orderId);
+            await loadTraceRequests();
+            await loadOrders();
+            showAlert("success", "已同意溯源申请并完成按订单号溯源。全流程已写入审计日志。");
+        } catch (e) {
+            showAlert("danger", `审批失败：${escapeHtml(e.message)}`);
+        }
+    }
+
+    async function rejectTraceRequest(requestId) {
+        const admin_note = prompt("请输入拒绝原因：", "证据不足，暂不触发溯源") || "证据不足，暂不触发溯源";
+        try {
+            await apiRequest(`/admin/trace_requests/${requestId}/reject`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ admin_note })
+            });
+            await loadTraceRequests();
+            showAlert("success", "已拒绝该溯源申请，并写入审计日志。");
+        } catch (e) {
+            showAlert("danger", `拒绝失败：${escapeHtml(e.message)}`);
+        }
+    }
+
+    async function traceViolation() {
+        const traceOrderInput = document.getElementById("traceOrderIdInput");
+        const orderId = (traceOrderInput.value.trim() || document.getElementById("orderIdInput").value.trim());
+        const reason = document.getElementById("reasonInput").value.trim();
+
+        if (!orderId || !reason) {
+            return showAlert("warning", "必须提供订单号和溯源原因！");
+        }
+
+        try {
+            const json = await apiRequest("/admin/trace", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ order_id: orderId, reason })
+            });
+
+            const data = json.data || {};
+            const card = document.getElementById("traceResultCard");
+            const body = document.getElementById("traceResultBody");
+
+            const orders = data.orders || [];
+            const ordersHtml = orders.length > 0
+                ? `<ul class="mb-0">
+                    ${orders.map(order => `
+                        <li class="mb-2">
+                            <div><strong>order_id:</strong> <span class="hash-text">${escapeHtml(order.order_id)}</span></div>
+                            <div><strong>status:</strong> ${escapeHtml(order.status)}</div>
+                            <div><strong>created_at:</strong> ${escapeHtml(order.created_at)}</div>
+                        </li>
+                    `).join("")}
+                </ul>`
+                : `<div class="text-muted">无关联订单</div>`;
+
+            body.innerHTML = `
+                <div class="alert alert-danger">
+                    <strong>TRACE_SUCCESS</strong>：已按订单号触发条件溯源；PID 仍由后端内部维护，不在管理员页面展示。
+                </div>
+                <div class="mb-2"><strong>触发订单号：</strong><span class="hash-text">${escapeHtml(orderId)}</span></div>
+                <div class="mb-2"><strong>用户名：</strong>${escapeHtml(data.username)}</div>
+                <div class="mb-2"><strong>用户ID：</strong>${escapeHtml(data.user_id)}</div>
+                <div class="mb-2"><strong>注册时间：</strong>${escapeHtml(data.created_at)}</div>
+                <div class="mb-2"><strong>关联订单：</strong></div>
+                ${ordersHtml}
+            `;
+
+            card.style.display = "block";
+            document.getElementById("orderIdInput").value = orderId;
+            await fetchAuditLogs(orderId);
+            showAlert("success", "溯源成功，结果已展示，并已写入审计日志。");
+        } catch (e) {
+            document.getElementById("traceResultCard").style.display = "none";
+            showAlert("danger", `溯源请求失败：${escapeHtml(e.message)}`);
+        }
+    }
 
     window.addEventListener("DOMContentLoaded", () => {
         checkAdminSession();
     });
 
-    // Allow Enter key to submit login
     document.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && document.getElementById("adminLogin").style.display !== "none") {
             handleAdminLogin();
@@ -819,12 +756,6 @@ async function traceViolation() {
     });
 </script>
 
-</div>
-    </div>
-</div>
-</div><!-- end adminPanel -->
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
 </body>
 </html>
