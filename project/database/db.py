@@ -1,9 +1,25 @@
 import sqlite3
+import sys
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+def _get_base_dir():
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent.parent.parent
+
+
+BASE_DIR = _get_base_dir()
 DB_PATH = BASE_DIR / "foodshield.db"
-SCHEMA_PATH = BASE_DIR / "project" / "database" / "schema.sql"
+
+
+def _get_schema_path():
+    if getattr(sys, "frozen", False):
+        return Path(sys._MEIPASS) / "project" / "database" / "schema.sql"
+    return BASE_DIR / "project" / "database" / "schema.sql"
+
+
+SCHEMA_PATH = _get_schema_path()
 
 
 def get_db_connection():
